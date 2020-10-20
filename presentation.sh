@@ -139,7 +139,7 @@ do
 					sleep 1
 					hide
 					sleep 9 # Make sure things load completely
-					/usr/bin/wmctrl -r $file -b add,shaded
+					#/usr/bin/wmctrl -r $file -b add,shaded
 
 				# Next check hash to see if we need to reload
 				elif [ "$md5" != "$savedHash" ]; then
