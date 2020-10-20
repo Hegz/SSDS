@@ -55,6 +55,7 @@ function activate {
 
 		$WMCTRL -r $file -b remove,shaded
 		$WMCTRL -a "$window"
+		hide
 		# sleep 1
 	fi
 }
