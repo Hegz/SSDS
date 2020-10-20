@@ -31,6 +31,7 @@ function activate {
 	itter=0
 	WinLoaded=true
 	echo activating window: "$window"
+	hide
 	while ! $WMCTRL -l | grep -F -q "$window"
 	do	
 		echo Window \"$window\" not yet loaded.
@@ -150,9 +151,7 @@ do
 					/usr/bin/libreoffice "macro:///Standard.TV.Reload" "$REPLY"
 					fileHash["$file"]=$md5
 				fi
-				
 				activate "$file"
-				hide
 
 				echo starting presentation $file
 				/usr/bin/libreoffice "macro:///Standard.TV.Main" "$REPLY"
