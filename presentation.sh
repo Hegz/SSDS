@@ -53,6 +53,7 @@ function activate {
 	if [ "$WinLoaded" = true ]; then
 		echo window  \"$window\" has been activated
 
+		$WMCTRL -r $file -b remove,shaded
 		$WMCTRL -a "$window"
 		# sleep 1
 	fi
@@ -149,7 +150,6 @@ do
 					fileHash["$file"]=$md5
 				fi
 				
-				/usr/bin/wmctrl -r $file -b remove,shaded
 				activate "$file"
 				hide
 
