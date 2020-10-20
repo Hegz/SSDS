@@ -3,10 +3,22 @@
 
 # Requires: xdotool wmctl
 
+
+# Directory containing the presentation files
 PRESENTATION="/home/ubuntu/Presentation"
+
+# Directory containing the control files
 CONTROL="/home/ubuntu/Control"
-LIBREOFFICE="/usr/bin/libreoffice"
+
+# Image file to use for hiding
 HIDEIMAGE="/home/ubuntu/School_District_73.jpg"
+
+# Binaries
+LIBREOFFICE="/usr/bin/libreoffice"
+IMAGEVIEWER="/usr/bin/feh"
+WMCTRL="/usr/bin/wmctrl"
+UNCLUTTER="/usr/bin/unclutter"
+VIDEOPLAYER="/usr/bin/cvlc"
 
 # Keep track of MD5sums in an associative array
 declare -A fileHash
@@ -19,7 +31,7 @@ function activate {
 	itter=0
 	WinLoaded=true
 	echo activating window: "$window"
-	while ! /usr/bin/wmctrl -l | grep -F -q "$window"
+	while ! $WMCTRL -l | grep -F -q "$window"
 	do	
 		echo Window \"$window\" not yet loaded.
 		sleep 0.2
@@ -41,33 +53,33 @@ function activate {
 	if [ "$WinLoaded" = true ]; then
 		echo window  \"$window\" has been activated
 
-		/usr/bin/wmctrl -a "$window"
+		$WMCTRL -a "$window"
 		# sleep 1
 	fi
 }
 
 function unhide {
-	/usr/bin/wmctrl -r $HIDEIMAGE -b remove,above
-	/usr/bin/wmctrl -r $HIDEIMAGE -b add,below
-	/usr/bin/wmctrl -r $HIDEIMAGE -b add,hidden
+	$WMCTRL -r $HIDEIMAGE -b remove,above
+	$WMCTRL -r $HIDEIMAGE -b add,below
+	$WMCTRL -r $HIDEIMAGE -b add,hidden
 	echo Revealing All
 }
 
 function hide {
-	/usr/bin/wmctrl -a $HIDEIMAGE 
-	/usr/bin/wmctrl -r $HIDEIMAGE -b remove,below
-	/usr/bin/wmctrl -r $HIDEIMAGE -b add,above	
-	/usr/bin/wmctrl -r $HIDEIMAGE -b remove,hidden
+	$WMCTRL -a $HIDEIMAGE 
+	$WMCTRL -r $HIDEIMAGE -b remove,below
+	$WMCTRL -r $HIDEIMAGE -b add,above	
+	$WMCTRL -r $HIDEIMAGE -b remove,hidden
 	echo Hiding all windows
 }
 
 # Launch hiding window
-feh -ZxFYq $HIDEIMAGE &
+$IMAGEVIEWER -ZxFYq $HIDEIMAGE &
 
 hide
 
 # Hide the mouse as much as possible
-unclutter -idle 0.01 -root &
+$UNCLUTTER -idle 0.01 -root &
 
 Weekdays=(Monday Tuesday Wednesday Thursday Friday Saturday Sunday)
 
@@ -127,7 +139,7 @@ do
 					sleep 1
 					hide
 					sleep 9 # Make sure things load completely
-					#/usr/bin/wmctrl -r $file -b add,shaded
+					/usr/bin/wmctrl -r $file -b add,shaded
 
 				# Next check hash to see if we need to reload
 				elif [ "$md5" != "$savedHash" ]; then
@@ -173,7 +185,7 @@ do
 			jpeg | jpg | gif | png)
 				# Standard image file types, add more here if needed.
 				oldPid=$imagePid
-				feh -ZxFYq "$REPLY" &
+				$IMAGEVIEWER -ZxFYq "$REPLY" &
 				imagePid=$!
 				sleep 1
 				kill $oldPid
@@ -183,7 +195,7 @@ do
 
 			avi | mov | mp4 | ogg | wmv | webm)
 				echo playing video $file 
-				cvlc --no-video-title --fullscreen --video-on-top --play-and-exit "$REPLY"
+				$CVLC --no-video-title --fullscreen --video-on-top --play-and-exit "$REPLY"
 				;;
 
 			*) 
