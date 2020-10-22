@@ -33,7 +33,7 @@ function activate {
 	echo activating window: "$window"
 	hide
 	while ! $WMCTRL -l | grep -F -q "$window"
-	do	
+	do
 		echo Window \"$window\" not yet loaded.
 		sleep 0.2
 		let "itter++"
@@ -126,7 +126,7 @@ do
 			odp) 
 				# Activate the next slide show in the series
 
-				hide
+				#hide
 
 				md5sum=$(md5sum "$REPLY")
 				md5Array=($md5sum)
@@ -174,7 +174,7 @@ do
 					/usr/bin/wmctrl -a "Presenting: $base"
 					sleep 0.2
 				done
-				hide
+				#hide
 
 				echo Presentation Finished
 				
@@ -196,7 +196,7 @@ do
 
 			avi | mov | mp4 | ogg | wmv | webm)
 				echo playing video $file 
-				$CVLC --no-video-title --fullscreen --video-on-top --play-and-exit "$REPLY"
+				$VIDEOPLAYER --no-video-title --fullscreen --video-on-top --play-and-exit "$REPLY"
 				;;
 
 			*) 
