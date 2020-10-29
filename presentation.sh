@@ -213,6 +213,7 @@ do
 	myCurrentMd5sum=$(md5sum "${0}")
 	myCurrentMd5Array=($md5sum)
 	myCurrentMd5=${md5Array[0]}
+	echo Starting md5 [$myStartMd5] CurrentMd5 [$myCurrentMd5]
 
 	if [ "$myCurrentMd5" != "$myStartMd5" ]; then
 		echo "The script has been updated.  exiting."
