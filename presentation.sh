@@ -25,7 +25,7 @@ declare -A fileHash
 
 myStartMd5sum=$(md5sum "${0}")
 myStartMd5Array=($myStartMd5sum)
-myStartMd5=${md5Array[0]}
+myStartMd5=${myStartMd5Array[0]}
 
 # Cleanup
 rm -f $CONTROL/*
@@ -211,8 +211,8 @@ do
 	done 9< <( find $PRESENTATION -type f -exec printf '%s\0' {} + )
 
 	myCurrentMd5sum=$(md5sum "${0}")
-	myCurrentMd5Array=($md5sum)
-	myCurrentMd5=${md5Array[0]}
+	myCurrentMd5Array=($myCurrentMd5sum)
+	myCurrentMd5=${myCurrentMd5Array[0]}
 	echo Starting md5 [$myStartMd5] CurrentMd5 [$myCurrentMd5]
 
 	if [ "$myCurrentMd5" != "$myStartMd5" ]; then
