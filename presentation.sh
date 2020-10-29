@@ -166,7 +166,7 @@ do
 				echo Waiting for end file
 				
 				kill $imagePid
-				unhide
+				#unhide
 
 				activate "Presenting: $base"
 
