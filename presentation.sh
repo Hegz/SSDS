@@ -23,7 +23,7 @@ VIDEOPLAYER="/usr/bin/cvlc"
 # Keep track of MD5sums in an associative array
 declare -A fileHash
 
-myStartMd5sum=$(md5sum "$REPLY")
+myStartMd5sum=$(md5sum "${0}")
 myStartMd5Array=($md5sum)
 myStartMd5=${md5Array[0]}
 
@@ -210,7 +210,7 @@ do
 
 	done 9< <( find $PRESENTATION -type f -exec printf '%s\0' {} + )
 
-	myCurrentMd5sum=$(md5sum "$REPLY")
+	myCurrentMd5sum=$(md5sum "${0}")
 	myCurrentMd5Array=($md5sum)
 	myCurrentMd5=${md5Array[0]}
 
