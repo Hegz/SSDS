@@ -24,7 +24,7 @@ VIDEOPLAYER="/usr/bin/cvlc"
 declare -A fileHash
 
 myStartMd5sum=$(md5sum "${0}")
-myStartMd5Array=($md5sum)
+myStartMd5Array=($myStartMd5sum)
 myStartMd5=${md5Array[0]}
 
 # Cleanup
