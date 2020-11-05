@@ -1,7 +1,7 @@
 #!/bin/bash
 # echo() { :; }  # comment this line to enable debuging
 
-# Requires: xdotool wmctl
+# Requires: wmctl
 
 
 # Directory containing the presentation files
@@ -22,10 +22,6 @@ VIDEOPLAYER="/usr/bin/cvlc"
 
 # Keep track of MD5sums in an associative array
 declare -A fileHash
-
-myStartMd5sum=$(md5sum "${0}")
-myStartMd5Array=($myStartMd5sum)
-myStartMd5=${myStartMd5Array[0]}
 
 # Cleanup
 rm -f $CONTROL/*
@@ -60,16 +56,7 @@ function activate {
 
 		$WMCTRL -r $file -b remove,shaded
 		$WMCTRL -a "$window"
-		#hide
-		# sleep 1
 	fi
-}
-
-function unhide {
-	$WMCTRL -r $HIDEIMAGE -b remove,above
-	$WMCTRL -r $HIDEIMAGE -b add,below
-	$WMCTRL -r $HIDEIMAGE -b add,hidden
-	echo Revealing All
 }
 
 function hide {
@@ -120,7 +107,7 @@ do
 			/usr/bin/wmctrl -c "$file"
 			continue
 		fi
-				
+
 		# Case insensitive file type determination
 		extention="${file##*.}"
 		ext="${extention,,}"
@@ -129,8 +116,6 @@ do
 
 			odp) 
 				# Activate the next slide show in the series
-
-				#hide
 
 				md5sum=$(md5sum "$REPLY")
 				md5Array=($md5sum)
@@ -164,26 +149,19 @@ do
 				echo base [$base]
 
 				echo Waiting for end file
-				
 				kill $imagePid
-				#unhide
 
 				activate "Presenting: $base"
 
-				#/usr/bin/wmctrl -r $file -b add,shaded
-				
 				# Wait for $CONTROLL/End file to appear at end of presentation
 				while [ ! -f "$CONTROL/End" ]
 				do
 					/usr/bin/wmctrl -a "Presenting: $base"
 					sleep 0.2
 				done
-				#hide
 
 				echo Presentation Finished
-				
 				/usr/bin/wmctrl -c "Presenting: $base"
-				
 				hide
 				;;
 
@@ -210,13 +188,4 @@ do
 
 	done 9< <( find $PRESENTATION -type f -exec printf '%s\0' {} + )
 
-	myCurrentMd5sum=$(md5sum "${0}")
-	myCurrentMd5Array=($myCurrentMd5sum)
-	myCurrentMd5=${myCurrentMd5Array[0]}
-	echo Starting md5 [$myStartMd5] CurrentMd5 [$myCurrentMd5]
-
-	if [ "$myCurrentMd5" != "$myStartMd5" ]; then
-		echo "The script has been updated.  exiting."
-		exit 0;
-	fi
 done
