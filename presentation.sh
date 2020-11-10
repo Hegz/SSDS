@@ -14,7 +14,7 @@ CONTROL="/home/ubuntu/Control"
 HIDEIMAGE="/home/ubuntu/School_District_73.jpg"
 
 # Binaries
-LIBREOFFICE="/usr/bin/libreoffice"
+LIBREOFFICE="/usr/bin/libreoffice --view --norestore --nologo --minimized"
 IMAGEVIEWER="/usr/bin/feh"
 WMCTRL="/usr/bin/wmctrl"
 UNCLUTTER="/usr/bin/unclutter"
@@ -127,7 +127,7 @@ do
 				# Check for Preload, if not load now.
 				if ! /usr/bin/wmctrl -l | grep -F -q "$file"; then
 					echo Document not loaded.  Loading now
-					libreoffice --view --norestore --nologo --minimized "$REPLY" &
+					$LIBREOFFICE "$REPLY" &
 					sleep 1
 					hide
 					sleep 9 # Make sure things load completely
@@ -137,13 +137,13 @@ do
 				elif [ "$md5" != "$savedHash" ]; then
 					echo "File hashes for $file differ, reloading."
 					activate "$file"
-					/usr/bin/libreoffice "macro:///Standard.TV.Reload" "$REPLY"
+					$LIBREOFFICE "macro:///Standard.TV.Reload" "$REPLY"
 					fileHash["$file"]=$md5
 				fi
 				activate "$file"
 
 				echo starting presentation $file
-				/usr/bin/libreoffice "macro:///Standard.TV.Main" "$REPLY"
+				$LIBREOFFICE "macro:///Standard.TV.Main" "$REPLY"
 
 				base=${file%.*}
 				echo base [$base]
