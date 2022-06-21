@@ -1,24 +1,22 @@
 #!/bin/bash
 # echo() { :; }  # comment this line to enable debuging
 
-# Requires: wmctl
-
+HOME="/home/otto"
 
 # Directory containing the presentation files
-PRESENTATION="/home/ubuntu/Presentation"
+PRESENTATION="$HOME/Presentation"
 
 # Directory containing the control files
-CONTROL="/home/ubuntu/Control"
-
-# Image file to use for hiding
-HIDEIMAGE="/home/ubuntu/School_District_73.jpg"
+CONTROL="$HOME/Control"
 
 # Binaries
-LIBREOFFICE="/usr/bin/libreoffice --view --norestore --nologo --minimized"
-IMAGEVIEWER="/usr/bin/feh"
-WMCTRL="/usr/bin/wmctrl"
-UNCLUTTER="/usr/bin/unclutter"
-VIDEOPLAYER="/usr/bin/cvlc"
+SWAYSOCK=$(sway --get-socketpath)
+sleep 1;
+SWAYMSG="/usr/bin/swaymsg -q -s $SWAYSOCK "
+SWAYMSG_LOUD="/usr/bin/swaymsg -s $SWAYSOCK "
+LIBREOFFICE="$SWAYMSG -- exec /usr/bin/libreoffice --view --norestore --nologo "
+IMAGEVIEWER="$SWAYMSG -- exec /usr/bin/imv-wayland -s full -f "
+VIDEOPLAYER="$SWAYMSG_LOUD -- exec /usr/bin/mpv --fullscreen "
 
 # Keep track of MD5sums in an associative array
 declare -A fileHash
@@ -26,61 +24,40 @@ declare -A fileHash
 # Cleanup
 rm -f $CONTROL/*
 
-function activate {
-	window=$@
-	itter=0
-	WinLoaded=true
-	echo activating window: "$window"
-	hide
-	while ! $WMCTRL -l | grep -F -q "$window"
-	do
-		echo Window \"$window\" not yet loaded.
-		sleep 0.2
-		let "itter++"
-
-		# Winners don't loop to infinity.
-		if [ $itter -gt 50 ]
-		then
-			# Failure to load window
-			echo Kill all humans.
-			killall soffice.bin
-			killall feh
-			killall cvlc
-			WinLoaded=false
-			break
-		fi
-	done
-	
-	if [ "$WinLoaded" = true ]; then
-		echo window  \"$window\" has been activated
-
-		$WMCTRL -r $file -b remove,shaded
-		$WMCTRL -a "$window"
-	fi
-}
-
-function hide {
-	$WMCTRL -a $HIDEIMAGE 
-	$WMCTRL -r $HIDEIMAGE -b remove,below
-	$WMCTRL -r $HIDEIMAGE -b add,above	
-	$WMCTRL -r $HIDEIMAGE -b remove,hidden
-	echo Hiding all windows
-}
-
-# Launch hiding window
-$IMAGEVIEWER -ZxFYq $HIDEIMAGE &
-
-hide
-
-# Hide the mouse as much as possible
-$UNCLUTTER -idle 0.01 -root &
-
+# Weekday Names
 Weekdays=(Monday Tuesday Wednesday Thursday Friday Saturday Sunday)
+
+function workspace {
+	# Switches to a workspace, one of Vid, Img, Slide, Hide, Load
+	$SWAYMSG -- workspace --no-auto-back-and-forth "$1" 
+}
+
+function reload_impress {
+	echo "File hashes for $file differ, reloading."
+	workspace Hide
+	$SWAYMSG [title=\"Presenting: "$base"\"] kill
+	sleep 1
+	workspace Load
+	$LIBREOFFICE "macro:///Standard.TV.Reload" "$REPLY"
+	workspace Hide
+	sleep 10
+	workspace Slide
+	$LIBREOFFICE "macro:///Standard.TV.Main" "$REPLY"
+}
+
+#Start Libreoffice on the load workspace, then Hide
+workspace Load
+$LIBREOFFICE &
+workspace Hide
 
 # main loop
 while true 
 do
+	# Get todays Weekday name
 	Today=$(date +%A)
+	killall imv-wayland
+	killall mpv
+	OldImg=""
 
 	while IFS= read -r -d '' -u 9
 	do
@@ -88,9 +65,9 @@ do
 		# Ignore files that are marked with a weekday name that is not todays.
 		if [[ "$REPLY" != *"$Today"* ]]; then
 			wrongDay=false
-			for day in ${Weekdays[@]}; do
+			for day in "${Weekdays[@]}"; do
 				if [[ "$REPLY" ==  *"$day"* ]]; then
-					echo Skipping $REPLY -- marked to play on $day.  
+					echo Skipping "$REPLY" -- marked to play on "$day".  
 					wrongDay=true
 					break
 				fi
@@ -104,7 +81,7 @@ do
 
 		if ! [ -f "$REPLY" ]; then
 			echo "The file ($REPLY) is missing, jumping to next file"
-			/usr/bin/wmctrl -c "$file"
+			$SWAYMSG [title=\"$file.*\"] kill
 			continue
 		fi
 
@@ -118,71 +95,90 @@ do
 				# Activate the next slide show in the series
 
 				md5sum=$(md5sum "$REPLY")
-				md5Array=($md5sum)
+				md5Array=("$md5sum")
 				md5=${md5Array[0]}
 				savedHash=${fileHash["$file"]}
-				echo saved hash [$savedHash]
-				echo new hash "$md5" 
 
 				# Check for Preload, if not load now.
-				if ! /usr/bin/wmctrl -l | grep -F -q "$file"; then
+				if ! $SWAYMSG_LOUD -t get_tree | grep -F -q "$file"; then
 					echo Document not loaded.  Loading now
-					$LIBREOFFICE "$REPLY" &
-					sleep 1
-					hide
+					workspace Load
+					$LIBREOFFICE "$REPLY"
+				        sleep 1	
+					workspace Hide
 					sleep 9 # Make sure things load completely
-					/usr/bin/wmctrl -r $file -b add,shaded
 
 				# Next check hash to see if we need to reload
 				elif [ "$md5" != "$savedHash" ]; then
-					echo "File hashes for $file differ, reloading."
-					activate "$file"
-					$LIBREOFFICE "macro:///Standard.TV.Reload" "$REPLY"
-					fileHash["$file"]=$md5
+					reload_impress
 				fi
-				activate "$file"
 
-				echo starting presentation $file
+				echo starting presentation "$file"
+				workspace Slide
 				$LIBREOFFICE "macro:///Standard.TV.Main" "$REPLY"
+				fileHash["$file"]=$md5
 
 				base=${file%.*}
-				echo base [$base]
 
 				echo Waiting for end file
-				kill $imagePid
-
-				activate "Presenting: $base"
 
 				# Wait for $CONTROLL/End file to appear at end of presentation
 				while [ ! -f "$CONTROL/End" ]
 				do
-					/usr/bin/wmctrl -a "Presenting: $base"
-					sleep 0.2
+					sleep 1
+					((rate_limit+=1))  # Limit the time spent calcing Hashes.  this isn't bitcoin.
+					
+					if [ "$rate_limit" -ge 15 ]; then
+					# Recalc md5sum reload if needed.
+						rate_limit=0
+                                		md5sum=$(md5sum "$REPLY")
+				                md5Array=("$md5sum")
+						md5=${md5Array[0]}
+						savedHash=${fileHash["$file"]}
+
+						if [ "$md5" != "$savedHash" ]; then
+							reload_impress
+							fileHash["$file"]=$md5
+						fi
+					fi
 				done
 
+				workspace Hide
+				$SWAYMSG [title=\"Presenting: "$base"\"] kill
+				workspace Hide
+				sleep 2
+				rm -f $CONTROL/End
 				echo Presentation Finished
-				/usr/bin/wmctrl -c "Presenting: $base"
-				hide
 				;;
 
 			jpeg | jpg | gif | png)
 				# Standard image file types, add more here if needed.
-				oldPid=$imagePid
-				$IMAGEVIEWER -ZxFYq "$REPLY" &
-				imagePid=$!
+				workspace Img
+				$IMAGEVIEWER \""$REPLY"\"
 				sleep 1
-				kill $oldPid
-				sleep 6
+				if [ -n "${OldImg}" ]; then
 
+					args=("$OldImg")
+
+					OldPID=$(ps -C imv-wayland -o pid=,args= | grep "${args[@]}" | awk '{print $1}')
+					echo "Attempting to kill $OldImg ($OldPID)"
+					kill $OldPID
+
+				fi
+				OldImg=$REPLY
+				sleep 6
 				;;
 
 			avi | mov | mp4 | ogg | wmv | webm)
-				echo playing video $file 
-				$VIDEOPLAYER --no-video-title --fullscreen --video-on-top --play-and-exit "$REPLY"
+				workspace Vid
+				VideoLen=$(ffprobe -i "$REPLY" -show_entries format=duration -v quiet -of csv="p=0")
+				$VIDEOPLAYER \""$REPLY"\" 
+				sleep "$VideoLen"
+				sleep 2
 				;;
 
 			*) 
-				echo Unsupported file $file
+				echo Unsupported file "$file"
 				;;
 		esac
 
