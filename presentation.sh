@@ -10,13 +10,15 @@ PRESENTATION="$HOME/Presentation"
 CONTROL="$HOME/Control"
 
 # Binaries
-SWAYSOCK=$(sway --get-socketpath)
+SWAY_PATH="/home/otto/.nix-profile/bin"
+SWAYSOCK=$($SWAY_PATH/sway --get-socketpath)
 sleep 1;
-SWAYMSG="/usr/bin/swaymsg -q -s $SWAYSOCK "
-SWAYMSG_LOUD="/usr/bin/swaymsg -s $SWAYSOCK "
-LIBREOFFICE="$SWAYMSG -- exec /usr/bin/libreoffice --view --norestore --nologo "
-IMAGEVIEWER="$SWAYMSG -- exec /usr/bin/imv-wayland -s full -f "
-VIDEOPLAYER="$SWAYMSG_LOUD -- exec /usr/bin/mpv --fullscreen "
+SWAYMSG="$SWAY_PATH/swaymsg -q -s $SWAYSOCK "
+SWAYMSG_LOUD="$SWAY_PATH/swaymsg -s $SWAYSOCK "
+BIN_PATH="/etc/profiles/per-user/otto/bin"
+LIBREOFFICE="$SWAYMSG -- exec $BIN_PATH/libreoffice --view --norestore --nologo "
+IMAGEVIEWER="$SWAYMSG -- exec $BIN_PATH/imv-wayland -s full -f "
+VIDEOPLAYER="$SWAYMSG_LOUD -- exec $BIN_PATH/mpv --fullscreen "
 
 # Keep track of MD5sums in an associative array
 declare -A fileHash
@@ -55,8 +57,8 @@ while true
 do
 	# Get todays Weekday name
 	Today=$(date +%A)
-	killall imv-wayland
-	killall mpv
+	$BIN_PATH/killall imv-wayland
+	$BIN_PATH/killall mpv
 	OldImg=""
 
 	while IFS= read -r -d '' -u 9
@@ -131,8 +133,8 @@ do
 					if [ "$rate_limit" -ge 15 ]; then
 					# Recalc md5sum reload if needed.
 						rate_limit=0
-                                		md5sum=$(md5sum "$REPLY")
-				                md5Array=("$md5sum")
+                        md5sum=$(md5sum "$REPLY")
+				        md5Array=("$md5sum")
 						md5=${md5Array[0]}
 						savedHash=${fileHash["$file"]}
 
@@ -162,7 +164,7 @@ do
 
 					OldPID=$(ps -C imv-wayland -o pid=,args= | grep "${args[@]}" | awk '{print $1}')
 					echo "Attempting to kill $OldImg ($OldPID)"
-					kill $OldPID
+					/run/current-system/sw/bin/kill $OldPID
 
 				fi
 				OldImg=$REPLY
