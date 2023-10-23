@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # echo() { :; }  # comment this line to enable debuging
 
 HOME="/home/otto"

@@ -1,8 +1,8 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 cd /home/otto
 
 while true; do
-	echo === Starting presentation ====
+	# echo === Starting presentation ====
 	/home/otto/ssds/presentation.sh 2>&1 /dev/null
 done
