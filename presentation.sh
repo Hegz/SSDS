@@ -173,7 +173,7 @@ do
 
 			avi | mov | mp4 | ogg | wmv | webm)
 				workspace Vid
-				VideoLen=$(ffprobe -i "$REPLY" -show_entries format=duration -v quiet -of csv="p=0")
+				VideoLen=$($BIN_PATH/ffprobe -i "$REPLY" -show_entries format=duration -v quiet -of csv="p=0")
 				$VIDEOPLAYER \""$REPLY"\" 
 				sleep "$VideoLen"
 				sleep 2
