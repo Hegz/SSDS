@@ -106,9 +106,9 @@ do
 					echo Document not loaded.  Loading now
 					workspace Load
 					$LIBREOFFICE "$REPLY"
-				        sleep 1	
+				    sleep 1	
 					workspace Hide
-					sleep 9 # Make sure things load completely
+					sleep 15 # Make sure things load completely
 
 				# Next check hash to see if we need to reload
 				elif [ "$md5" != "$savedHash" ]; then
