@@ -70,12 +70,7 @@ Sub addListener
 	oPresentation.IsFullScreen = True
 	oPresentation.IsTransitionOnClick = True
 	oPresentation.AllowAnimations = True
-	if Multifile() then
-		oPresentation.Pause = 30
-	else
-		oPresentation.Pause = 0
-	end if
-
+	oPresentation.Pause = 2
 	oPresentation.Start()
 	wait 200
 
