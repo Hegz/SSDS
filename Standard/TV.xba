@@ -48,43 +48,12 @@ Sub EV_slideEnded(oEv)
 	slideIndex = oController.getCurrentSlideIndex + 1
 	
 	if slideIndex = oSlideCount then
-		&apos; wait Slideshow_Pause * 1000
-		&apos; If this is multifile show, write to control file, and pause
-		if Multifile() then
 
-			writeText(endFile, now)
-			oController.removeSlideShowListener(oListener)
-			oController.pause()
-		&apos;else
-			&apos;oController.gotoSlideIndex(0)
-			&apos;oController.pause()
-			&apos;wait Slideshow_Pause * 100
-			&apos;oController.resume()
-		end if	
+		writeText(endFile, now)
+		oController.removeSlideShowListener(oListener)
+		oController.pause()
 	end if
 End Sub
-
-Function Multifile
-	&apos; Check if we have multiple files in the folder
-	dim sFile As String
-	dim i As Integer
-	i = 0
-	sFile = Dir(path,0)
-	&apos; Check for ODP files in the presentation folder
-	while sFile &lt;&gt; &quot;&quot;
-		sFile = Lcase(sFile)	
-		if InStr(Right(sFile, 3),&quot;odp&quot;) then
-			i = i + 1
-		end if
-		sFile = Dir
-	wend
-
-	if i &gt; 1 then
-		Multifile = True
-	else
-		Multifile = False
-	end if
-End Function
 
 Sub addListener
 	oDoc = ThisComponent 
