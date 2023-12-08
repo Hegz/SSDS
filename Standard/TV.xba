@@ -48,7 +48,7 @@ Sub EV_slideEnded(oEv)
 	slideIndex = oController.getCurrentSlideIndex + 1
 	
 	if slideIndex = oSlideCount then
-
+		
 		writeText(endFile, now)
 		oController.removeSlideShowListener(oListener)
 		oController.pause()
@@ -70,18 +70,18 @@ Sub addListener
 	oPresentation.IsFullScreen = True
 	oPresentation.IsTransitionOnClick = True
 	oPresentation.AllowAnimations = True
-	oPresentation.Pause = 2
+	oPresentation.Pause = 5
 	oPresentation.Start()
-	wait 200
+	wait 300
 
  	oListener = createUnoListener(&quot;EV_&quot;,&quot;com.sun.star.presentation.XSlideShowListener&quot;)
  	&apos; com.sun.star.presentation.XSlideShowListener
 
-	wait 200
+	wait 300
 	oController = oPresentation.Controller
 	&apos; com.sun.star.presentation.XSlideShowController
 	
-	wait 200
+	wait 300
 	
 	oController.addSlideShowListener(oListener)
 	oSlideCount = oController.getSlideCount()
