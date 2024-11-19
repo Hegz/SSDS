@@ -19,6 +19,7 @@ BIN_PATH="/etc/profiles/per-user/otto/bin"
 LIBREOFFICE="$SWAYMSG -- exec $BIN_PATH/libreoffice --view --norestore --nologo "
 IMAGEVIEWER="$SWAYMSG -- exec $BIN_PATH/imv-wayland -s full -f "
 VIDEOPLAYER="$SWAYMSG_LOUD -- exec $BIN_PATH/mpv --fullscreen "
+ImageSleepTime=6
 
 # Keep track of MD5sums in an associative array
 declare -A fileHash
@@ -28,6 +29,9 @@ rm -f $CONTROL/*
 
 # Weekday Names
 Weekdays=(Monday Tuesday Wednesday Thursday Friday Saturday Sunday)
+
+# Load cfg values
+source <(grep = ../config.ini)
 
 function workspace {
 	# Switches to a workspace, one of Vid, Img, Slide, Hide, Load
@@ -168,7 +172,7 @@ do
 
 				fi
 				OldImg=$REPLY
-				sleep 6
+				sleep $ImageSleepTime
 				;;
 
 			avi | mov | mp4 | ogg | wmv | webm)
