@@ -31,7 +31,9 @@ rm -f $CONTROL/*
 Weekdays=(Monday Tuesday Wednesday Thursday Friday Saturday Sunday)
 
 # Load cfg values
-source <(grep = ../config.ini)
+if [ -f $HOME/config.ini ]; then
+	source <(grep = $HOME/config.ini)
+fi
 
 function workspace {
 	# Switches to a workspace, one of Vid, Img, Slide, Hide, Load
