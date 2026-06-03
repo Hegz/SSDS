@@ -33,6 +33,8 @@ Weekdays=(Monday Tuesday Wednesday Thursday Friday Saturday Sunday)
 # Load cfg values
 if [ -f $HOME/config.ini ]; then
 	source <(grep = $HOME/config.ini)
+	# ORDER_BY: "alphabetical" (default) or "random" (fixed seed per day)
+	ORDER_BY=${ORDER_BY:-alphabetical}
 fi
 
 function workspace {
@@ -190,6 +192,15 @@ do
 				;;
 		esac
 
-	done 9< <( find $PRESENTATION -type f -exec printf '%s\0' {} + )
+	done 9< <( if [ "$ORDER_BY" = "random" ]; then
+	# Deterministic random shuffle using sha256 hash per filename
+	find $PRESENTATION -type f -exec printf '%s\0' {} + | 
+		while IFS= read -r -d '' file; do
+			printf '%s\t%s\n' "$(sha256sum <<< "$file" | cut -d' ' -f1)" "$file"
+		done | sort | cut -f2-
+	else
+	# Sort alphabetically (case-insensitive)
+	find $PRESENTATION -type f -exec printf '%s\0' {} + | sort -z
+	fi )
 
 done
