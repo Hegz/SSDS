@@ -4,5 +4,5 @@ cd /home/otto
 
 while true; do
 	# echo === Starting presentation ====
-	/home/otto/ssds/presentation.sh 2>&1 /dev/null
+	/home/otto/ssds/presentation.sh > /dev/null 2>&1
 done
