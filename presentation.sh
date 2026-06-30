@@ -30,11 +30,16 @@ rm -f $CONTROL/*
 # Weekday Names
 Weekdays=(Monday Tuesday Wednesday Thursday Friday Saturday Sunday)
 
+#Set defaults if config is missing.
+ORDER_BY="alphabetical"
+ImageSleepTime=6
+
 # Load cfg values
-if [ -f $HOME/config.ini ]; then
-	source <(grep = $HOME/config.ini)
-	# ORDER_BY: "alphabetical" (default) or "random" (fixed seed per day)
-	ORDER_BY=${ORDER_BY:-alphabetical}
+if [ -f "$PRESENTATION/config.ini" ]; then
+    while IFS='=' read -r key value; do
+        [[ "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] && eval "$key=\"$value\""
+    done < "$HOME/config.ini"
+    ORDER_BY=${ORDER_BY:-alphabetical}
 fi
 
 function workspace {
@@ -192,15 +197,18 @@ do
 				;;
 		esac
 
+
 	done 9< <( if [ "$ORDER_BY" = "random" ]; then
-	# Deterministic random shuffle using sha256 hash per filename
-	find $PRESENTATION -type f -exec printf '%s\0' {} + | 
-		while IFS= read -r -d '' file; do
-			printf '%s\t%s\n' "$(sha256sum <<< "$file" | cut -d' ' -f1)" "$file"
-		done | sort | cut -f2-
+		find $PRESENTATION -type f -exec printf '%s\0' {} + | 
+			while IFS= read -r -d '' file; do
+				printf '%s\t%s\n' "$(sha256sum <<< "$file" | cut -d' ' -f1)" "$file"
+			done | sort | cut -f2-
+	elif [ "$ORDER_BY" = "date_newest" ]; then
+		find $PRESENTATION -type f -printf '%T@\t%p\0' | sort -z -n -r | cut -z -f2-
+	elif [ "$ORDER_BY" = "date_oldest" ]; then
+		find $PRESENTATION -type f -printf '%T@\t%p\0' | sort -z -n | cut -z -f2-
 	else
-	# Sort alphabetically (case-insensitive)
-	find $PRESENTATION -type f -exec printf '%s\0' {} + | sort -z
+		find $PRESENTATION -type f -exec printf '%s\0' {} + | sort -z
 	fi )
 
 done
