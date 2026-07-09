@@ -20,7 +20,6 @@ BIN_PATH="/etc/profiles/per-user/otto/bin"
 LIBREOFFICE_BIN="$BIN_PATH/libreoffice"
 IMAGEVIEWER_BIN="$BIN_PATH/imv-wayland"
 VIDEOPLAYER_BIN="$BIN_PATH/mpv"
-ImageSleepTime=6
 
 # Keep track of MD5sums in an associative array
 declare -A fileHash
@@ -31,10 +30,6 @@ rm -f "$CONTROL"/*
 # Weekday Names
 Weekdays=(Monday Tuesday Wednesday Thursday Friday Saturday Sunday)
 
-# Set defaults if config is missing.
-ORDER_BY="alphabetical"
-ImageSleepTime=6
-
 # Helper function to log cleanly to journalctl
 function log() {
     local priority="$1"
@@ -43,15 +38,30 @@ function log() {
     echo "[$priority] $message"
 }
 
+# Function to load configuration parameters
+function load_config {
+    # Set default values first in case keys are missing
+    ORDER_BY="alphabetical"
+    ImageSleepTime=6
+
+    if [ -f "$PRESENTATION/config.ini" ]; then
+        while IFS='=' read -r key value; do
+            [[ "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] && eval "$key=\"$value\""
+        done < "$PRESENTATION/config.ini"
+        ORDER_BY=${ORDER_BY:-alphabetical}
+        # Save the modification timestamp of the config file
+        LAST_CONFIG_MOD=$(stat -c %Y "$PRESENTATION/config.ini" 2>/dev/null || echo 0)
+        log notice "Configuration loaded/reloaded. ORDER_BY=$ORDER_BY, ImageSleepTime=$ImageSleepTime"
+    else
+        LAST_CONFIG_MOD=0
+        log warning "config.ini not found at $PRESENTATION/config.ini. Using system defaults."
+    fi
+}
+
 log info "Presentation script initialized."
 
-# Load cfg values
-if [ -f "$PRESENTATION/config.ini" ]; then
-    while IFS='=' read -r key value; do
-        [[ "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] && eval "$key=\"$value\""
-    done < "$PRESENTATION/config.ini"
-    ORDER_BY=${ORDER_BY:-alphabetical}
-fi
+# Initial configuration load on startup
+load_config
 
 function workspace {
 	$SWAYMSG -- workspace --no-auto-back-and-forth "$1" 
@@ -89,6 +99,15 @@ do
 
 	while IFS= read -r -d '' -u 9
 	do
+		# CHECK FOR CONFIG CHANGES: Before displaying the next file, check if config.ini has changed
+		if [ -f "$PRESENTATION/config.ini" ]; then
+			CURRENT_CONFIG_MOD=$(stat -c %Y "$PRESENTATION/config.ini" 2>/dev/null || echo 0)
+			if [ "$CURRENT_CONFIG_MOD" -ne "$LAST_CONFIG_MOD" ]; then
+				log info "Detected change in config.ini. Reloading settings dynamically..."
+				load_config
+			fi
+		fi
+
 		file=$(basename "$REPLY")
 		# Ignore files that are marked with a weekday name that is not todays.
 		if [[ "$REPLY" != *"$Today"* ]]; then
@@ -196,10 +215,12 @@ do
 				log info "Playing video: $file"
 				workspace Vid
 				VideoLen=$($BIN_PATH/ffprobe -i "$REPLY" -show_entries format=duration -v quiet -of csv="p=0")
+				
+				# Fixed to target standard OpenGL pipelines and bypass Vulkan on the RPi4
 				if ! $SWAYMSG_LOUD -- exec "$VIDEOPLAYER_BIN" \
 					--fullscreen \
-					--hwdec=v4l2m2m \
 					--gpu-api=opengl \
+					--hwdec=v4l2m2m \
 					"'""$REPLY""'" 2>&1; then
 					log err "Video player failed to play $file"
 				fi
