@@ -198,8 +198,8 @@ do
 				VideoLen=$($BIN_PATH/ffprobe -i "$REPLY" -show_entries format=duration -v quiet -of csv="p=0")
 				if ! $SWAYMSG_LOUD -- exec "$VIDEOPLAYER_BIN" \
 					--fullscreen \
-					--hwdec=auto \
-					--vo=gpu \
+					--hwdec=v4l2m2m \
+					--gpu-api=opengl \
 					"'""$REPLY""'" 2>&1; then
 					log err "Video player failed to play $file"
 				fi
