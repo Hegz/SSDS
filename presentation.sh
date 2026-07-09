@@ -36,13 +36,11 @@ ORDER_BY="alphabetical"
 ImageSleepTime=6
 
 # Helper function to log cleanly to journalctl
-# Usage: log [info|notice|warning|err] "message"
 function log() {
     local priority="$1"
     local message="$2"
-    # Sends logs tagged with 'presentation-script' to journalctl
     logger -t presentation-script -p "user.$priority" "$message"
-    echo "[$priority] $message" # Keep echo so terminal execution still displays it
+    echo "[$priority] $message"
 }
 
 log info "Presentation script initialized."
@@ -65,13 +63,13 @@ function reload_impress {
 	$SWAYMSG "[title=\"Presenting: $base\"]" kill
 	sleep 1
 	workspace Load
-	if ! $SWAYMSG -- exec "$LIBREOFFICE_BIN" --view --norestore --nologo "macro:///Standard.TV.Reload" "$REPLY" 2>&1; then
+	if ! $SWAYMSG -- exec "$LIBREOFFICE_BIN" --view --norestore --nologo "macro:///Standard.TV.Reload" "'""$REPLY""'" 2>&1; then
 		log err "Failed to execute LibreOffice Reload macro for $file"
 	fi
 	workspace Hide
 	sleep 10
 	workspace Slide
-	if ! $SWAYMSG -- exec "$LIBREOFFICE_BIN" --view --norestore --nologo "macro:///Standard.TV.Main" "$REPLY" 2>&1; then
+	if ! $SWAYMSG -- exec "$LIBREOFFICE_BIN" --view --norestore --nologo "macro:///Standard.TV.Main" "'""$REPLY""'" 2>&1; then
 		log err "Failed to execute LibreOffice Main macro during reload for $file"
 	fi
 }
@@ -130,7 +128,7 @@ do
 				if ! $SWAYMSG_LOUD -t get_tree | grep -F -q "$file"; then
 					log info "Document $file not preloaded. Loading now."
 					workspace Load
-					if ! $SWAYMSG -- exec "$LIBREOFFICE_BIN" --view --norestore --nologo "$REPLY" 2>&1; then
+					if ! $SWAYMSG -- exec "$LIBREOFFICE_BIN" --view --norestore --nologo "'""$REPLY""'" 2>&1; then
 						log err "LibreOffice failed initial preload background window for $file"
 					fi
 				    sleep 1	
@@ -143,7 +141,7 @@ do
 
 				log info "Starting presentation: $file"
 				workspace Slide
-				if ! $SWAYMSG -- exec "$LIBREOFFICE_BIN" --view --norestore --nologo "macro:///Standard.TV.Main" "$REPLY" 2>&1; then
+				if ! $SWAYMSG -- exec "$LIBREOFFICE_BIN" --view --norestore --nologo "macro:///Standard.TV.Main" "'""$REPLY""'" 2>&1; then
 					log err "LibreOffice failed to open presentation view for $file"
 				fi
 				fileHash["$file"]=$md5
@@ -178,7 +176,7 @@ do
 			jpeg | jpg | gif | png)
 				log info "Displaying image: $file"
 				workspace Img
-				if ! $SWAYMSG -- exec "$IMAGEVIEWER_BIN" -s full -f "$REPLY" 2>&1; then
+				if ! $SWAYMSG -- exec "$IMAGEVIEWER_BIN" -s full -f "'""$REPLY""'" 2>&1; then
 					log err "Image viewer failed to open $file"
 				fi
 				sleep 1
@@ -198,7 +196,7 @@ do
 				log info "Playing video: $file"
 				workspace Vid
 				VideoLen=$($BIN_PATH/ffprobe -i "$REPLY" -show_entries format=duration -v quiet -of csv="p=0")
-				if ! $SWAYMSG_LOUD -- exec "$VIDEOPLAYER_BIN" --fullscreen "$REPLY" 2>&1; then
+				if ! $SWAYMSG_LOUD -- exec "$VIDEOPLAYER_BIN" --fullscreen "'""$REPLY""'" 2>&1; then
 					log err "Video player failed to play $file"
 				fi
 				sleep "$VideoLen"
