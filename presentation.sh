@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# echo() { :; }  # comment this line to enable debuging
+# echo() { :; }  # comment this line to enable debugging
 
 HOME="/home/otto"
 
@@ -13,32 +13,34 @@ CONTROL="$HOME/Control"
 SWAY_PATH="/home/otto/.nix-profile/bin"
 SWAYSOCK=$($SWAY_PATH/sway --get-socketpath)
 sleep 1;
-SWAYMSG="$SWAY_PATH/swaymsg -q -s $SWAYSOCK "
-SWAYMSG_LOUD="$SWAY_PATH/swaymsg -s $SWAYSOCK "
+SWAYMSG="$SWAY_PATH/swaymsg -q -s $SWAYSOCK"
+SWAYMSG_LOUD="$SWAY_PATH/swaymsg -s $SWAYSOCK"
 BIN_PATH="/etc/profiles/per-user/otto/bin"
-LIBREOFFICE="$SWAYMSG -- exec $BIN_PATH/libreoffice --view --norestore --nologo "
-IMAGEVIEWER="$SWAYMSG -- exec $BIN_PATH/imv-wayland -s full -f "
-VIDEOPLAYER="$SWAYMSG_LOUD -- exec $BIN_PATH/mpv --fullscreen "
+
+# REMOVED internal 'exec' from variables to allow clean argument passing
+LIBREOFFICE_BIN="$BIN_PATH/libreoffice"
+IMAGEVIEWER_BIN="$BIN_PATH/imv-wayland"
+VIDEOPLAYER_BIN="$BIN_PATH/mpv"
 ImageSleepTime=6
 
 # Keep track of MD5sums in an associative array
 declare -A fileHash
 
 # Cleanup
-rm -f $CONTROL/*
+rm -f "$CONTROL"/*
 
 # Weekday Names
 Weekdays=(Monday Tuesday Wednesday Thursday Friday Saturday Sunday)
 
-#Set defaults if config is missing.
+# Set defaults if config is missing.
 ORDER_BY="alphabetical"
 ImageSleepTime=6
 
-# Load cfg values
+# Load cfg values (FIXED: points to $PRESENTATION/config.ini now)
 if [ -f "$PRESENTATION/config.ini" ]; then
     while IFS='=' read -r key value; do
         [[ "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] && eval "$key=\"$value\""
-    done < "$HOME/config.ini"
+    done < "$PRESENTATION/config.ini"
     ORDER_BY=${ORDER_BY:-alphabetical}
 fi
 
@@ -50,19 +52,19 @@ function workspace {
 function reload_impress {
 	echo "File hashes for $file differ, reloading."
 	workspace Hide
-	$SWAYMSG [title=\"Presenting: "$base"\"] kill
+	$SWAYMSG "[title=\"Presenting: $base\"]" kill
 	sleep 1
 	workspace Load
-	$LIBREOFFICE "macro:///Standard.TV.Reload" "$REPLY"
+	$SWAYMSG -- exec "$LIBREOFFICE_BIN" --view --norestore --nologo "macro:///Standard.TV.Reload" "$REPLY"
 	workspace Hide
 	sleep 10
 	workspace Slide
-	$LIBREOFFICE "macro:///Standard.TV.Main" "$REPLY"
+	$SWAYMSG -- exec "$LIBREOFFICE_BIN" --view --norestore --nologo "macro:///Standard.TV.Main" "$REPLY"
 }
 
-#Start Libreoffice on the load workspace, then Hide
+# Start Libreoffice on the load workspace, then Hide
 workspace Load
-$LIBREOFFICE &
+$SWAYMSG -- exec "$LIBREOFFICE_BIN" --view --norestore --nologo &
 workspace Hide
 
 # main loop
@@ -96,13 +98,14 @@ do
 
 		if ! [ -f "$REPLY" ]; then
 			echo "The file ($REPLY) is missing, jumping to next file"
-			$SWAYMSG [title=\"$file.*\"] kill
+			$SWAYMSG "[title=\"$file.*\"]" kill
 			continue
 		fi
 
 		# Case insensitive file type determination
 		extention="${file##*.}"
 		ext="${extention,,}"
+		base=${file%.*}
 
 		case $ext in
 
@@ -118,7 +121,7 @@ do
 				if ! $SWAYMSG_LOUD -t get_tree | grep -F -q "$file"; then
 					echo Document not loaded.  Loading now
 					workspace Load
-					$LIBREOFFICE "$REPLY"
+					$SWAYMSG -- exec "$LIBREOFFICE_BIN" --view --norestore --nologo "$REPLY"
 				    sleep 1	
 					workspace Hide
 					sleep 15 # Make sure things load completely
@@ -130,21 +133,19 @@ do
 
 				echo starting presentation "$file"
 				workspace Slide
-				$LIBREOFFICE "macro:///Standard.TV.Main" "$REPLY"
+				$SWAYMSG -- exec "$LIBREOFFICE_BIN" --view --norestore --nologo "macro:///Standard.TV.Main" "$REPLY"
 				fileHash["$file"]=$md5
-
-				base=${file%.*}
 
 				echo Waiting for end file
 
-				# Wait for $CONTROLL/End file to appear at end of presentation
+				# Wait for $CONTROL/End file to appear at end of presentation
 				while [ ! -f "$CONTROL/End" ]
 				do
 					sleep 1
-					((rate_limit+=1))  # Limit the time spent calcing Hashes.  this isn't bitcoin.
+					((rate_limit+=1))  # Limit the time spent calcing Hashes.
 					
 					if [ "$rate_limit" -ge 15 ]; then
-					# Recalc md5sum reload if needed.
+						# Recalc md5sum reload if needed.
 						rate_limit=0
                         md5sum=$(md5sum "$REPLY")
 				        md5Array=("$md5sum")
@@ -159,35 +160,32 @@ do
 				done
 
 				workspace Hide
-				$SWAYMSG [title=\"Presenting: "$base"\"] kill
+				$SWAYMSG "[title=\"Presenting: $base\"]" kill
 				workspace Hide
 				sleep 2
-				rm -f $CONTROL/End
+				rm -f "$CONTROL/End"
 				echo Presentation Finished
 				;;
 
 			jpeg | jpg | gif | png)
-				# Standard image file types, add more here if needed.
+				# Standard image file types
 				workspace Img
-				$IMAGEVIEWER \""$REPLY"\"
+				$SWAYMSG -- exec "$IMAGEVIEWER_BIN" -s full -f "$REPLY"
 				sleep 1
 				if [ -n "${OldImg}" ]; then
-
 					args=("$OldImg")
-
 					OldPID=$(ps -C imv-wayland -o pid=,args= | grep "${args[@]}" | awk '{print $1}')
 					echo "Attempting to kill $OldImg ($OldPID)"
-					/run/current-system/sw/bin/kill $OldPID
-
+					/run/current-system/sw/bin/kill "$OldPID"
 				fi
 				OldImg=$REPLY
-				sleep $ImageSleepTime
+				sleep "$ImageSleepTime"
 				;;
 
 			avi | mov | mp4 | ogg | wmv | webm)
 				workspace Vid
 				VideoLen=$($BIN_PATH/ffprobe -i "$REPLY" -show_entries format=duration -v quiet -of csv="p=0")
-				$VIDEOPLAYER \""$REPLY"\" 
+				$SWAYMSG_LOUD -- exec "$VIDEOPLAYER_BIN" --fullscreen "$REPLY"
 				sleep "$VideoLen"
 				sleep 2
 				;;
@@ -197,18 +195,16 @@ do
 				;;
 		esac
 
-
 	done 9< <( if [ "$ORDER_BY" = "random" ]; then
-		find $PRESENTATION -type f -exec printf '%s\0' {} + | 
+		find "$PRESENTATION" -type f -exec printf '%s\0' {} + | 
 			while IFS= read -r -d '' file; do
 				printf '%s\t%s\n' "$(sha256sum <<< "$file" | cut -d' ' -f1)" "$file"
 			done | sort | cut -f2-
 	elif [ "$ORDER_BY" = "date_newest" ]; then
-		find $PRESENTATION -type f -printf '%T@\t%p\0' | sort -z -n -r | cut -z -f2-
+		find "$PRESENTATION" -type f -printf '%T@\t%p\0' | sort -z -n -r | cut -z -f2-
 	elif [ "$ORDER_BY" = "date_oldest" ]; then
-		find $PRESENTATION -type f -printf '%T@\t%p\0' | sort -z -n | cut -z -f2-
+		find "$PRESENTATION" -type f -printf '%T@\t%p\0' | sort -z -n | cut -z -f2-
 	else
-		find $PRESENTATION -type f -exec printf '%s\0' {} + | sort -z
+		find "$PRESENTATION" -type f -exec printf '%s\0' {} + | sort -z
 	fi )
-
 done
