@@ -196,7 +196,11 @@ do
 				log info "Playing video: $file"
 				workspace Vid
 				VideoLen=$($BIN_PATH/ffprobe -i "$REPLY" -show_entries format=duration -v quiet -of csv="p=0")
-				if ! $SWAYMSG_LOUD -- exec "$VIDEOPLAYER_BIN" --fullscreen "'""$REPLY""'" 2>&1; then
+				if ! $SWAYMSG_LOUD -- exec "$VIDEOPLAYER_BIN" \
+					--fullscreen \
+					--hwdec=auto \
+					--vo=gpu \
+					"'""$REPLY""'" 2>&1; then
 					log err "Video player failed to play $file"
 				fi
 				sleep "$VideoLen"
