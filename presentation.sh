@@ -17,7 +17,6 @@ SWAYMSG="$SWAY_PATH/swaymsg -q -s $SWAYSOCK"
 SWAYMSG_LOUD="$SWAY_PATH/swaymsg -s $SWAYSOCK"
 BIN_PATH="/etc/profiles/per-user/otto/bin"
 
-# REMOVED internal 'exec' from variables to allow clean argument passing
 LIBREOFFICE_BIN="$BIN_PATH/libreoffice"
 IMAGEVIEWER_BIN="$BIN_PATH/imv-wayland"
 VIDEOPLAYER_BIN="$BIN_PATH/mpv"
@@ -36,7 +35,19 @@ Weekdays=(Monday Tuesday Wednesday Thursday Friday Saturday Sunday)
 ORDER_BY="alphabetical"
 ImageSleepTime=6
 
-# Load cfg values (FIXED: points to $PRESENTATION/config.ini now)
+# Helper function to log cleanly to journalctl
+# Usage: log [info|notice|warning|err] "message"
+function log() {
+    local priority="$1"
+    local message="$2"
+    # Sends logs tagged with 'presentation-script' to journalctl
+    logger -t presentation-script -p "user.$priority" "$message"
+    echo "[$priority] $message" # Keep echo so terminal execution still displays it
+}
+
+log info "Presentation script initialized."
+
+# Load cfg values
 if [ -f "$PRESENTATION/config.ini" ]; then
     while IFS='=' read -r key value; do
         [[ "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] && eval "$key=\"$value\""
@@ -45,21 +56,24 @@ if [ -f "$PRESENTATION/config.ini" ]; then
 fi
 
 function workspace {
-	# Switches to a workspace, one of Vid, Img, Slide, Hide, Load
 	$SWAYMSG -- workspace --no-auto-back-and-forth "$1" 
 }
 
 function reload_impress {
-	echo "File hashes for $file differ, reloading."
+	log notice "File hashes for $file differ, reloading."
 	workspace Hide
 	$SWAYMSG "[title=\"Presenting: $base\"]" kill
 	sleep 1
 	workspace Load
-	$SWAYMSG -- exec "$LIBREOFFICE_BIN" --view --norestore --nologo "macro:///Standard.TV.Reload" "$REPLY"
+	if ! $SWAYMSG -- exec "$LIBREOFFICE_BIN" --view --norestore --nologo "macro:///Standard.TV.Reload" "$REPLY" 2>&1; then
+		log err "Failed to execute LibreOffice Reload macro for $file"
+	fi
 	workspace Hide
 	sleep 10
 	workspace Slide
-	$SWAYMSG -- exec "$LIBREOFFICE_BIN" --view --norestore --nologo "macro:///Standard.TV.Main" "$REPLY"
+	if ! $SWAYMSG -- exec "$LIBREOFFICE_BIN" --view --norestore --nologo "macro:///Standard.TV.Main" "$REPLY" 2>&1; then
+		log err "Failed to execute LibreOffice Main macro during reload for $file"
+	fi
 }
 
 # Start Libreoffice on the load workspace, then Hide
@@ -70,7 +84,6 @@ workspace Hide
 # main loop
 while true 
 do
-	# Get todays Weekday name
 	Today=$(date +%A)
 	$BIN_PATH/killall imv-wayland
 	$BIN_PATH/killall mpv
@@ -84,7 +97,7 @@ do
 			wrongDay=false
 			for day in "${Weekdays[@]}"; do
 				if [[ "$REPLY" ==  *"$day"* ]]; then
-					echo Skipping "$REPLY" -- marked to play on "$day".  
+					log info "Skipping $file -- marked to play on $day."  
 					wrongDay=true
 					break
 				fi
@@ -94,15 +107,14 @@ do
 			fi
 		fi
 
-		echo "Processing $REPLY"
+		log info "Attempting to display file: $REPLY"
 
 		if ! [ -f "$REPLY" ]; then
-			echo "The file ($REPLY) is missing, jumping to next file"
+			log warning "The file ($REPLY) is missing, skipping."
 			$SWAYMSG "[title=\"$file.*\"]" kill
 			continue
 		fi
 
-		# Case insensitive file type determination
 		extention="${file##*.}"
 		ext="${extention,,}"
 		base=${file%.*}
@@ -110,42 +122,38 @@ do
 		case $ext in
 
 			odp) 
-				# Activate the next slide show in the series
-
 				md5sum=$(md5sum "$REPLY")
 				md5Array=("$md5sum")
 				md5=${md5Array[0]}
 				savedHash=${fileHash["$file"]}
 
-				# Check for Preload, if not load now.
 				if ! $SWAYMSG_LOUD -t get_tree | grep -F -q "$file"; then
-					echo Document not loaded.  Loading now
+					log info "Document $file not preloaded. Loading now."
 					workspace Load
-					$SWAYMSG -- exec "$LIBREOFFICE_BIN" --view --norestore --nologo "$REPLY"
+					if ! $SWAYMSG -- exec "$LIBREOFFICE_BIN" --view --norestore --nologo "$REPLY" 2>&1; then
+						log err "LibreOffice failed initial preload background window for $file"
+					fi
 				    sleep 1	
 					workspace Hide
-					sleep 15 # Make sure things load completely
+					sleep 15
 
-				# Next check hash to see if we need to reload
 				elif [ "$md5" != "$savedHash" ]; then
 					reload_impress
 				fi
 
-				echo starting presentation "$file"
+				log info "Starting presentation: $file"
 				workspace Slide
-				$SWAYMSG -- exec "$LIBREOFFICE_BIN" --view --norestore --nologo "macro:///Standard.TV.Main" "$REPLY"
+				if ! $SWAYMSG -- exec "$LIBREOFFICE_BIN" --view --norestore --nologo "macro:///Standard.TV.Main" "$REPLY" 2>&1; then
+					log err "LibreOffice failed to open presentation view for $file"
+				fi
 				fileHash["$file"]=$md5
 
-				echo Waiting for end file
-
-				# Wait for $CONTROL/End file to appear at end of presentation
 				while [ ! -f "$CONTROL/End" ]
 				do
 					sleep 1
-					((rate_limit+=1))  # Limit the time spent calcing Hashes.
+					((rate_limit+=1))
 					
 					if [ "$rate_limit" -ge 15 ]; then
-						# Recalc md5sum reload if needed.
 						rate_limit=0
                         md5sum=$(md5sum "$REPLY")
 				        md5Array=("$md5sum")
@@ -164,34 +172,41 @@ do
 				workspace Hide
 				sleep 2
 				rm -f "$CONTROL/End"
-				echo Presentation Finished
+				log info "Presentation finished: $file"
 				;;
 
 			jpeg | jpg | gif | png)
-				# Standard image file types
+				log info "Displaying image: $file"
 				workspace Img
-				$SWAYMSG -- exec "$IMAGEVIEWER_BIN" -s full -f "$REPLY"
+				if ! $SWAYMSG -- exec "$IMAGEVIEWER_BIN" -s full -f "$REPLY" 2>&1; then
+					log err "Image viewer failed to open $file"
+				fi
 				sleep 1
 				if [ -n "${OldImg}" ]; then
 					args=("$OldImg")
 					OldPID=$(ps -C imv-wayland -o pid=,args= | grep "${args[@]}" | awk '{print $1}')
-					echo "Attempting to kill $OldImg ($OldPID)"
-					/run/current-system/sw/bin/kill "$OldPID"
+					if [ -n "$OldPID" ]; then
+						log info "Killing old image process for $OldImg ($OldPID)"
+						/run/current-system/sw/bin/kill "$OldPID" 2>/dev/null
+					fi
 				fi
 				OldImg=$REPLY
 				sleep "$ImageSleepTime"
 				;;
 
 			avi | mov | mp4 | ogg | wmv | webm)
+				log info "Playing video: $file"
 				workspace Vid
 				VideoLen=$($BIN_PATH/ffprobe -i "$REPLY" -show_entries format=duration -v quiet -of csv="p=0")
-				$SWAYMSG_LOUD -- exec "$VIDEOPLAYER_BIN" --fullscreen "$REPLY"
+				if ! $SWAYMSG_LOUD -- exec "$VIDEOPLAYER_BIN" --fullscreen "$REPLY" 2>&1; then
+					log err "Video player failed to play $file"
+				fi
 				sleep "$VideoLen"
 				sleep 2
 				;;
 
 			*) 
-				echo Unsupported file "$file"
+				log warning "Unsupported file format skipped: $file"
 				;;
 		esac
 
