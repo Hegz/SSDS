@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
-<script:module xmlns:script="http://openoffice.org" script:name="TV" script:language="StarBasic" script:moduleType="normal">REM  *****  BASIC  *****
+<script:module xmlns:script="http://openoffice.org/2000/script" script:name="TV" script:language="StarBasic" script:moduleType="normal">REM  *****  BASIC  *****
 Option Explicit
 
 Global Const path = &quot;/home/otto/Presentation/&quot;
@@ -102,7 +102,7 @@ Sub addListener
 	oPresentation = oDoc.Presentation
 
 	oPresentation.CustomShow = &quot;&quot;
-	oPresentation.FirstPage = &quot;&quot;
+	oPresentation.FirstPage = &quot;1&quot;
 	oPresentation.IsAlwaysOnTop = True
 	oPresentation.IsAutomatic = False
 	oPresentation.IsMouseVisible = False
