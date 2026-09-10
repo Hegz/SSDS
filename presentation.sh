@@ -24,8 +24,9 @@ VIDEOPLAYER_BIN="$BIN_PATH/mpv"
 # Keep track of MD5sums in an associative array
 declare -A fileHash
 
-# Cleanup
+# Cleanup control files and left-over LibreOffice hidden crash lockfiles
 rm -f "$CONTROL"/*
+find "$PRESENTATION" -type f -name ".~lock.*.odp#" -delete 2>/dev/null
 
 # Weekday Names
 Weekdays=(Monday Tuesday Wednesday Thursday Friday Saturday Sunday)
@@ -73,12 +74,20 @@ function reload_impress {
 	$SWAYMSG "[title=\"Presenting: $base\"]" kill
 	sleep 1
 	workspace Load
+	
+	# Give Sway/Wayland time to shift and map the background context
+	sleep 1.5
+	
 	if ! $SWAYMSG -- exec "$LIBREOFFICE_BIN" --view --norestore --nologo "macro:///Standard.TV.Reload" "'""$REPLY""'" 2>&1; then
 		log err "Failed to execute LibreOffice Reload macro for $file"
 	fi
 	workspace Hide
 	sleep 10
 	workspace Slide
+	
+	# Give Sway time to anchor focus before triggering the initialization loop macro
+	sleep 1.5
+	
 	if ! $SWAYMSG -- exec "$LIBREOFFICE_BIN" --view --norestore --nologo "macro:///Standard.TV.Main" "'""$REPLY""'" 2>&1; then
 		log err "Failed to execute LibreOffice Main macro during reload for $file"
 	fi
@@ -141,7 +150,7 @@ do
 			odp) 
 				md5sum=$(md5sum "$REPLY")
 				md5Array=("$md5sum")
-				md5=${md5Array[0]}
+				md5=${md5Array}
 				savedHash=${fileHash["$file"]}
 
 				if ! $SWAYMSG_LOUD -t get_tree | grep -F -q "$file"; then
@@ -160,6 +169,10 @@ do
 
 				log info "Starting presentation: $file"
 				workspace Slide
+				
+				# Give Sway/Wayland 1.5 seconds to settle the workspace swap and focus the window
+				sleep 1.5
+
 				if ! $SWAYMSG -- exec "$LIBREOFFICE_BIN" --view --norestore --nologo "macro:///Standard.TV.Main" "'""$REPLY""'" 2>&1; then
 					log err "LibreOffice failed to open presentation view for $file"
 				fi
@@ -174,7 +187,7 @@ do
 						rate_limit=0
                         md5sum=$(md5sum "$REPLY")
 				        md5Array=("$md5sum")
-						md5=${md5Array[0]}
+						md5=${md5Array}
 						savedHash=${fileHash["$file"]}
 
 						if [ "$md5" != "$savedHash" ]; then

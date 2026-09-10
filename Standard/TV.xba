@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE script:module PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "module.dtd">
-<script:module xmlns:script="http://openoffice.org/2000/script" script:name="TV" script:language="StarBasic" script:moduleType="normal">REM  *****  BASIC  *****
+<script:module xmlns:script="http://openoffice.org" script:name="TV" script:language="StarBasic" script:moduleType="normal">REM  *****  BASIC  *****
 Option Explicit
 
 Global Const path = &quot;/home/otto/Presentation/&quot;
@@ -10,96 +10,140 @@ Global Const endFile = &quot;/home/otto/Control/End&quot;
 Global Const Slideshow_Pause = 7
 
 Global oDoc As Object
-global oPresentation As Object
+Global oPresentation As Object
 Global oController As Object	
 Global oListener As Object
 Global oSlideCount As Integer
+
+&apos; Helper function to reliably fetch the presentation document over Wayland/Sway race conditions
+Function GetPresentationDoc() As Object
+    Dim oCurrentDoc As Object
+    Dim iAttempts As Integer
+    
+    &apos; Loop up to 5 times to give Sway time to settle window focus
+    For iAttempts = 1 To 5
+        oCurrentDoc = StarDesktop.getCurrentComponent()
+        
+        If Not IsNull(oCurrentDoc) Then
+            &apos; Ensure it is the actual presentation document, not an empty background framework
+            If HasUnoInterfaces(oCurrentDoc, "com.sun.star.drawing.XDrawPagesSupplier") Then
+                GetPresentationDoc = oCurrentDoc
+                Exit Function
+            End If
+        End If
+        Wait 500 &apos; Wait half a second before retrying
+    Next iAttempts
+    
+    &apos; Fallback verification
+    If HasUnoInterfaces(ThisComponent, "com.sun.star.drawing.XDrawPagesSupplier") Then
+        GetPresentationDoc = ThisComponent
+    Else
+        GetPresentationDoc = Nothing
+    End If
+End Function
 
 Sub Main
 	Dim Doc as Object
 	Dim CurSlide as Object
 	Dim i as Integer
-	Doc = ThisComponent
+	
+	Doc = GetPresentationDoc()
+	If IsNull(Doc) Then
+		&apos; Fail silently or exit without throwing a hard runtime popup blocking the kiosk
+		Exit Sub
+	End If
 	
 	&apos; Change slideshow to autoadvance slides, and set the interval
-	for i = 0 to Doc.getDrawPages().Count-1
+	For i = 0 To Doc.getDrawPages().Count - 1
 		CurSlide = Doc.getDrawPages().getByIndex(i)
-		Doc.CurrentController.setCurrentPage(CurSlide)
-		if CurSlide.Change &lt;&gt; 1 then
+		
+		&apos; Safely guard the controller context
+		If Not IsNull(Doc.CurrentController) Then
+			Doc.CurrentController.setCurrentPage(CurSlide)
+		End If
+		
+		If CurSlide.Change &lt;&gt; 1 Then
 			CurSlide.Change = 1
-		end if
+		End If
 		CurSlide.Duration = Slideshow_Pause
-	next i
+	Next i
 	
-	CurSlide = Doc.getDrawPages().getByIndex(0)
-	Doc.CurrentController.setCurrentPage(CurSlide)
+	If Not IsNull(Doc.CurrentController) Then
+		CurSlide = Doc.getDrawPages().getByIndex(0)
+		Doc.CurrentController.setCurrentPage(CurSlide)
+	End If
 
-	if FileExists(endFile) Then
-		kill endFile
-	end if
+	If FileExists(endFile) Then
+		Kill endFile
+	End If
 
-	addlistener
+	addListener
 End Sub
 
 Sub EV_slideEnded(oEv)
-
 	&apos; Check for end of slide show
-	dim slideIndex as Integer
-	slideIndex = oController.getCurrentSlideIndex + 1
+	Dim slideIndex as Integer
 	
-	if slideIndex = oSlideCount then
-		
-		writeText(endFile, now)
+	If IsNull(oController) Then Exit Sub
+	
+	slideIndex = oController.getCurrentSlideIndex() + 1
+	
+	If slideIndex = oSlideCount Then
+		writeText(endFile, Now)
 		oController.removeSlideShowListener(oListener)
 		oController.pause()
-	end if
+	End If
 End Sub
 
 Sub addListener
-	oDoc = ThisComponent 
+	oDoc = GetPresentationDoc()
+	If IsNull(oDoc) Then Exit Sub
 
 	oPresentation = oDoc.Presentation
-	&apos; com.sun.star.presentation.Presentation
 
 	oPresentation.CustomShow = &quot;&quot;
-	oPresentation.FirstPage = &quot;1&quot;
+	oPresentation.FirstPage = &quot;&quot;
 	oPresentation.IsAlwaysOnTop = True
 	oPresentation.IsAutomatic = False
 	oPresentation.IsMouseVisible = False
-	oPresentation.IsEndless =  True
+	oPresentation.IsEndless = True
 	oPresentation.IsFullScreen = True
 	oPresentation.IsTransitionOnClick = True
 	oPresentation.AllowAnimations = True
 	oPresentation.Pause = 5
 	oPresentation.Start()
-	wait 300
+	Wait 300
 
  	oListener = createUnoListener(&quot;EV_&quot;,&quot;com.sun.star.presentation.XSlideShowListener&quot;)
- 	&apos; com.sun.star.presentation.XSlideShowListener
 
-	wait 300
+	Wait 300
 	oController = oPresentation.Controller
-	&apos; com.sun.star.presentation.XSlideShowController
 	
-	wait 300
+	Wait 300
 	
-	oController.addSlideShowListener(oListener)
-	oSlideCount = oController.getSlideCount()
-
-end sub
+	If Not IsNull(oController) Then
+		oController.addSlideShowListener(oListener)
+		oSlideCount = oController.getSlideCount()
+	End If
+End Sub
 
 Sub Reload
-	dim document, dispatcher as Object
-	document = ThisComponent.CurrentController.Frame
+	Dim document As Object, dispatcher As Object
+	Dim activeDoc As Object
+	
+	activeDoc = GetPresentationDoc()
+	If IsNull(activeDoc) Then Exit Sub
+	
+	document = activeDoc.CurrentController.Frame
 	dispatcher = createUnoService(&quot;com.sun.star.frame.DispatchHelper&quot;)
 	dispatcher.executeDispatch(document, &quot;.uno:Reload&quot;, &quot;&quot;, 0, Array())
-end sub
+End Sub
 
 Sub writeText(myFile As String, myText As String)
-	dim FileNo
+	Dim FileNo
 	FileNo = FreeFile
-	open myFile for Output as #FileNo
-		print #FileNo, myText
+	Open myFile For Output As #FileNo
+		Print #FileNo, myText
 	Close #FileNo
 End Sub
 </script:module>
