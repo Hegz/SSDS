@@ -5,6 +5,7 @@ Option Explicit
 
 Global Const path = &quot;/home/otto/Presentation/&quot;
 Global Const endFile = &quot;/home/otto/Control/End&quot;
+Global Const currentFileControl = &quot;/home/otto/Control/CurrentFile&quot;
 
 &apos; Seconds to pause between slides
 Global Const Slideshow_Pause = 7
@@ -15,30 +16,43 @@ Global oController As Object
 Global oListener As Object
 Global oSlideCount As Integer
 
-&apos; Helper function to reliably fetch the presentation document over Wayland/Sway race conditions
+&apos; Identify the exact presentation document bash wants shown right now,
+&apos; by matching against the control file -- never by guessing at window
+&apos; focus, which Sway does not reliably hand off across workspaces.
 Function GetPresentationDoc() As Object
-    Dim oCurrentDoc As Object
-    Dim iAttempts As Integer
-    
-    &apos; Loop up to 5 times to give Sway time to settle window focus
-    For iAttempts = 1 To 5
-        oCurrentDoc = StarDesktop.getCurrentComponent()
-        
-        If Not IsNull(oCurrentDoc) Then
-            &apos; Ensure it is the actual presentation document, not an empty background framework
-            If HasUnoInterfaces(oCurrentDoc, "com.sun.star.drawing.XDrawPagesSupplier") Then
-                GetPresentationDoc = oCurrentDoc
-                Exit Function
+    Dim sTargetFile As String
+    Dim sTargetURL As String
+    Dim oEnum As Object
+    Dim oComp As Object
+    Dim iFileNo As Integer
+
+    GetPresentationDoc = Nothing
+    sTargetFile = ""
+
+    On Error Resume Next
+    iFileNo = FreeFile
+    Open currentFileControl For Input As #iFileNo
+    Line Input #iFileNo, sTargetFile
+    Close #iFileNo
+    On Error Goto 0
+
+    If sTargetFile &lt;&gt; "" Then
+        sTargetURL = ConvertToURL(sTargetFile)
+        oEnum = StarDesktop.Components.createEnumeration()
+        While oEnum.hasMoreElements()
+            oComp = oEnum.nextElement()
+            If HasUnoInterfaces(oComp, "com.sun.star.drawing.XDrawPagesSupplier") Then
+                If oComp.getURL() = sTargetURL Then
+                    GetPresentationDoc = oComp
+                    Exit Function
+                End If
             End If
-        End If
-        Wait 500 &apos; Wait half a second before retrying
-    Next iAttempts
-    
-    &apos; Fallback verification
+        Wend
+    End If
+
+    &apos; Last-resort fallback only if the control file was missing or stale
     If HasUnoInterfaces(ThisComponent, "com.sun.star.drawing.XDrawPagesSupplier") Then
         GetPresentationDoc = ThisComponent
-    Else
-        GetPresentationDoc = Nothing
     End If
 End Function
 

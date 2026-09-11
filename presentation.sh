@@ -68,6 +68,14 @@ function workspace {
 	$SWAYMSG -- workspace --no-auto-back-and-forth "$1" 
 }
 
+# Tell the TV.xba macro which file it should operate on, via the control
+# channel, instead of trying to thread it through the CLI as a stray
+# argument (which soffice treats as a second document to open, not as a
+# parameter to the macro).
+function signal_current_file {
+	printf '%s' "$REPLY" > "$CONTROL/CurrentFile"
+}
+
 function reload_impress {
 	log notice "File hashes for $file differ, reloading."
 	workspace Hide
@@ -78,7 +86,8 @@ function reload_impress {
 	# Give Sway/Wayland time to shift and map the background context
 	sleep 1.5
 	
-	if ! $SWAYMSG -- exec "$LIBREOFFICE_BIN" --view --norestore --nologo "macro:///Standard.TV.Reload" "'""$REPLY""'" 2>&1; then
+	signal_current_file
+	if ! $SWAYMSG -- exec "$LIBREOFFICE_BIN" --view --norestore --nologo "macro:///Standard.TV.Reload" 2>&1; then
 		log err "Failed to execute LibreOffice Reload macro for $file"
 	fi
 	workspace Hide
@@ -88,7 +97,8 @@ function reload_impress {
 	# Give Sway time to anchor focus before triggering the initialization loop macro
 	sleep 1.5
 	
-	if ! $SWAYMSG -- exec "$LIBREOFFICE_BIN" --view --norestore --nologo "macro:///Standard.TV.Main" "'""$REPLY""'" 2>&1; then
+	signal_current_file
+	if ! $SWAYMSG -- exec "$LIBREOFFICE_BIN" --view --norestore --nologo "macro:///Standard.TV.Main" 2>&1; then
 		log err "Failed to execute LibreOffice Main macro during reload for $file"
 	fi
 }
@@ -173,7 +183,8 @@ do
 				# Give Sway/Wayland 1.5 seconds to settle the workspace swap and focus the window
 				sleep 1.5
 
-				if ! $SWAYMSG -- exec "$LIBREOFFICE_BIN" --view --norestore --nologo "macro:///Standard.TV.Main" "'""$REPLY""'" 2>&1; then
+				signal_current_file
+				if ! $SWAYMSG -- exec "$LIBREOFFICE_BIN" --view --norestore --nologo "macro:///Standard.TV.Main" 2>&1; then
 					log err "LibreOffice failed to open presentation view for $file"
 				fi
 				fileHash["$file"]=$md5
