@@ -87,6 +87,12 @@ Sub Main
 		Doc.CurrentController.setCurrentPage(CurSlide)
 	End If
 
+	&apos; Touching Change/Duration above marks the document "modified".
+	&apos; Clear it -- otherwise a later Reload finds a dirty document and
+	&apos; pops a "save changes?" dialog with nobody present to answer it,
+	&apos; which blocks the kiosk indefinitely on a hidden workspace.
+	Doc.setModified(False)
+
 	If FileExists(endFile) Then
 		Kill endFile
 	End If
@@ -118,16 +124,25 @@ Sub EV_slideEnded(oEv)
 End Sub
 
 &apos; True only when exactly one presentable file currently sits in the
-&apos; rotation folder (config.ini excluded). Adjust the exclusion list
-&apos; here if your rotation also mixes in images or video.
+&apos; rotation folder. "Presentable" means it matches the same extension
+&apos; whitelist bash's own case statement uses -- not merely "isn&apos;t
+&apos; config.ini" -- so stray junk like READ ME.txt or Thumbs.db can&apos;t
+&apos; block the native loop.
 Function IsSoloFile() As Boolean
 	Dim sFile As String
+	Dim sExt As String
+	Dim iDot As Integer
 	Dim iCount As Integer
 	iCount = 0
 	sFile = Dir(path &amp; "*.*", 0)
 	While sFile &lt;&gt; "" And iCount &lt; 2
-		If sFile &lt;&gt; "config.ini" Then
-			iCount = iCount + 1
+		iDot = InStrRev(sFile, ".")
+		If iDot &gt; 0 Then
+			sExt = LCase(Mid(sFile, iDot + 1))
+			Select Case sExt
+				Case "odp", "jpeg", "jpg", "gif", "png", "avi", "mov", "mp4", "ogg", "wmv", "webm"
+					iCount = iCount + 1
+			End Select
 		End If
 		sFile = Dir()
 	Wend
@@ -175,6 +190,11 @@ Sub Reload
 	
 	document = activeDoc.CurrentController.Frame
 	dispatcher = createUnoService(&quot;com.sun.star.frame.DispatchHelper&quot;)
+
+	&apos; Belt-and-suspenders: guarantee no save-changes prompt can block
+	&apos; this reload, regardless of what set the modified flag.
+	activeDoc.setModified(False)
+
 	dispatcher.executeDispatch(document, &quot;.uno:Reload&quot;, &quot;&quot;, 0, Array())
 End Sub
 
