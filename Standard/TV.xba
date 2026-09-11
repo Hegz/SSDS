@@ -103,11 +103,36 @@ Sub EV_slideEnded(oEv)
 	slideIndex = oController.getCurrentSlideIndex() + 1
 	
 	If slideIndex = oSlideCount Then
-		writeText(endFile, Now)
-		oController.removeSlideShowListener(oListener)
-		oController.pause()
+		&apos; If this is the only presentable file in rotation, bash has
+		&apos; nothing to hand control back for. Let Impress keep looping
+		&apos; on its own (IsEndless is already True) instead of tearing
+		&apos; the view down and rebuilding it every pass. Re-checked on
+		&apos; every wraparound, so a second file added later is still
+		&apos; picked up within one full cycle of this deck.
+		If Not IsSoloFile() Then
+			writeText(endFile, Now)
+			oController.removeSlideShowListener(oListener)
+			oController.pause()
+		End If
 	End If
 End Sub
+
+&apos; True only when exactly one presentable file currently sits in the
+&apos; rotation folder (config.ini excluded). Adjust the exclusion list
+&apos; here if your rotation also mixes in images or video.
+Function IsSoloFile() As Boolean
+	Dim sFile As String
+	Dim iCount As Integer
+	iCount = 0
+	sFile = Dir(path &amp; "*.*", 0)
+	While sFile &lt;&gt; "" And iCount &lt; 2
+		If sFile &lt;&gt; "config.ini" Then
+			iCount = iCount + 1
+		End If
+		sFile = Dir()
+	Wend
+	IsSoloFile = (iCount = 1)
+End Function
 
 Sub addListener
 	oDoc = GetPresentationDoc()

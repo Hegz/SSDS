@@ -76,6 +76,16 @@ function signal_current_file {
 	printf '%s' "$REPLY" > "$CONTROL/CurrentFile"
 }
 
+# True only when exactly one presentable file (config.ini excluded)
+# currently sits in the rotation folder. Used by the video branch to
+# decide whether to let mpv loop the file natively instead of the
+# usual sleep/kill/relaunch cycle between files.
+function is_solo_file {
+	local count
+	count=$(find "$PRESENTATION" -type f ! -name "config.ini" | wc -l)
+	[ "$count" -eq 1 ]
+}
+
 function reload_impress {
 	log notice "File hashes for $file differ, reloading."
 	workspace Hide
@@ -238,18 +248,49 @@ do
 			avi | mov | mp4 | ogg | wmv | webm)
 				log info "Playing video: $file"
 				workspace Vid
-				VideoLen=$($BIN_PATH/ffprobe -i "$REPLY" -show_entries format=duration -v quiet -of csv="p=0")
-				
-				# Fixed to target standard OpenGL pipelines and bypass Vulkan on the RPi4
-				if ! $SWAYMSG_LOUD -- exec "$VIDEOPLAYER_BIN" \
-					--fullscreen \
-					--gpu-api=opengl \
-					--hwdec=v4l2m2m \
-					"'""$REPLY""'" 2>&1; then
-					log err "Video player failed to play $file"
+
+				if is_solo_file; then
+					log info "Single presentable file detected -- looping video natively via mpv."
+					if ! $SWAYMSG_LOUD -- exec "$VIDEOPLAYER_BIN" \
+						--fullscreen \
+						--gpu-api=opengl \
+						--hwdec=v4l2m2m \
+						--loop-file=inf \
+						"'""$REPLY""'" 2>&1; then
+						log err "Video player failed to play $file"
+					fi
+
+					# mpv now loops the file forever on its own. Sit here and
+					# watch only for a reason to reclaim control: the file's
+					# content changing on disk, config.ini changing, or a
+					# second file appearing in the rotation.
+					savedHash=$(md5sum "$REPLY")
+					while true; do
+						sleep 15
+						if [ -f "$PRESENTATION/config.ini" ]; then
+							CURRENT_CONFIG_MOD=$(stat -c %Y "$PRESENTATION/config.ini" 2>/dev/null || echo 0)
+							[ "$CURRENT_CONFIG_MOD" -ne "$LAST_CONFIG_MOD" ] && break
+						fi
+						is_solo_file || break
+						[ -f "$REPLY" ] || break
+						currentHash=$(md5sum "$REPLY")
+						[ "$currentHash" != "$savedHash" ] && break
+					done
+					$BIN_PATH/killall mpv
+				else
+					VideoLen=$($BIN_PATH/ffprobe -i "$REPLY" -show_entries format=duration -v quiet -of csv="p=0")
+
+					# Fixed to target standard OpenGL pipelines and bypass Vulkan on the RPi4
+					if ! $SWAYMSG_LOUD -- exec "$VIDEOPLAYER_BIN" \
+						--fullscreen \
+						--gpu-api=opengl \
+						--hwdec=v4l2m2m \
+						"'""$REPLY""'" 2>&1; then
+						log err "Video player failed to play $file"
+					fi
+					sleep "$VideoLen"
+					sleep 2
 				fi
-				sleep "$VideoLen"
-				sleep 2
 				;;
 
 			*) 
