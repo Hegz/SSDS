@@ -6,6 +6,7 @@ Option Explicit
 Global Const path = &quot;/home/otto/Presentation/&quot;
 Global Const endFile = &quot;/home/otto/Control/End&quot;
 Global Const currentFileControl = &quot;/home/otto/Control/CurrentFile&quot;
+Global Const readOnlyFlag = &quot;/home/otto/Control/ReadOnly&quot;
 
 &apos; Seconds to pause between slides
 Global Const Slideshow_Pause = 7
@@ -64,6 +65,15 @@ Sub Main
 	Doc = GetPresentationDoc()
 	If IsNull(Doc) Then
 		&apos; Fail silently or exit without throwing a hard runtime popup blocking the kiosk
+		Exit Sub
+	End If
+
+	&apos; A stale lock file (or a genuinely locked document) opens read-only.
+	&apos; Setting slide properties below would then throw an unhandled error
+	&apos; and silently abort this Sub before addListener ever runs -- flag it
+	&apos; for bash instead, so this is a log line, not a VNC investigation.
+	If Doc.isReadonly() Then
+		writeText(readOnlyFlag, "Document opened read-only: " &amp; Doc.getURL() &amp; " at " &amp; Now)
 		Exit Sub
 	End If
 	

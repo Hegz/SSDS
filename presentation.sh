@@ -199,6 +199,21 @@ do
 				fi
 				fileHash["$file"]=$md5
 
+				# Give Main a moment to either succeed or flag read-only
+				# (almost always a stale lock file from an earlier crash or
+				# an unclean office_refresh kill) before we start waiting
+				# on an End signal that a read-only document can never send.
+				sleep 2
+				if [ -f "$CONTROL/ReadOnly" ]; then
+					log warning "$(cat "$CONTROL/ReadOnly" 2>/dev/null) -- closing, clearing stale lock, will load fresh next pass"
+					rm -f "$CONTROL/ReadOnly"
+					workspace Hide
+					$SWAYMSG "[title=\"$file.*\"]" kill
+					find "$PRESENTATION" -maxdepth 1 -type f -name ".~lock.${file}#" -delete 2>/dev/null
+					unset "fileHash[$file]"
+					continue
+				fi
+
 				while [ ! -f "$CONTROL/End" ]
 				do
 					sleep 1
@@ -214,6 +229,9 @@ do
 						if [ "$md5" != "$savedHash" ]; then
 							reload_impress
 							fileHash["$file"]=$md5
+							if [ -f "$CONTROL/ReadOnly" ]; then
+								log warning "$(cat "$CONTROL/ReadOnly" 2>/dev/null) -- reload landed read-only; not auto-recovered mid-show, needs a look"
+							fi
 						fi
 					fi
 				done
