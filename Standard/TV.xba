@@ -200,20 +200,19 @@ Sub addListener
 End Sub
 
 Sub Reload
-	Dim document As Object, dispatcher As Object
 	Dim activeDoc As Object
 	
 	activeDoc = GetPresentationDoc()
 	If IsNull(activeDoc) Then Exit Sub
 	
-	document = activeDoc.CurrentController.Frame
-	dispatcher = createUnoService(&quot;com.sun.star.frame.DispatchHelper&quot;)
-
-	&apos; Belt-and-suspenders: guarantee no save-changes prompt can block
-	&apos; this reload, regardless of what set the modified flag.
+	&apos; .uno:Reload runs its own interactive "cancel all changes?" check
+	&apos; whose exact timing against this dispatch process can&apos;t be trusted.
+	&apos; Close outright instead -- setModified(False) means close() has
+	&apos; nothing to ask permission for either -- and let bash reopen the
+	&apos; file fresh, the same path already proven safe for a file it has
+	&apos; never seen before.
 	activeDoc.setModified(False)
-
-	dispatcher.executeDispatch(document, &quot;.uno:Reload&quot;, &quot;&quot;, 0, Array())
+	activeDoc.close(False)
 End Sub
 
 Sub writeText(myFile As String, myText As String)

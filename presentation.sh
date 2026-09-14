@@ -100,6 +100,16 @@ function reload_impress {
 	if ! $SWAYMSG -- exec "$LIBREOFFICE_BIN" --view --norestore --nologo "macro:///Standard.TV.Reload" 2>&1; then
 		log err "Failed to execute LibreOffice Reload macro for $file"
 	fi
+	sleep 2
+
+	# TV.Reload now just closes the stale document -- reopen the updated
+	# file fresh here, the same plain-path load already used for a file
+	# bash has never encountered before, rather than trust .uno:Reload's
+	# own interactive confirmation dialog to behave.
+	if ! $SWAYMSG -- exec "$LIBREOFFICE_BIN" --view --norestore --nologo "'""$REPLY""'" 2>&1; then
+		log err "LibreOffice failed to reopen $file after close"
+	fi
+	sleep 1
 	workspace Hide
 	sleep 10
 	workspace Slide
