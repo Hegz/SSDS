@@ -174,7 +174,7 @@ Sub addListener
 	oPresentation.IsFullScreen = True
 	oPresentation.IsTransitionOnClick = True
 	oPresentation.AllowAnimations = True
-	oPresentation.Pause = 5
+	oPresentation.Pause = 0
 	oPresentation.Start()
 	Wait 300
 
@@ -189,6 +189,14 @@ Sub addListener
 		oController.addSlideShowListener(oListener)
 		oSlideCount = oController.getSlideCount()
 	End If
+
+	&apos; The Presentation-property writes above (CustomShow, FirstPage,
+	&apos; IsEndless, Pause, etc.) run after Main already cleared the
+	&apos; modified flag, and re-dirty the document the same way slide
+	&apos; properties do. Clear it again here, after everything in the
+	&apos; startup sequence that could possibly touch it -- this is the
+	&apos; actual last word on the subject, not the one in Main.
+	oDoc.setModified(False)
 End Sub
 
 Sub Reload
