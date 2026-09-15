@@ -192,7 +192,7 @@ do
 			odp) 
 				md5sum=$(md5sum "$REPLY")
 				md5Array=("$md5sum")
-				md5=${md5Array[0]} 				# Array index important here...
+				md5=${md5Array[1]} 				# Array index important here...
 				savedHash=${fileHash["$file"]}
 
 				log info "Md5sum($md5) savedHash($savedHash)"
@@ -212,6 +212,7 @@ do
 
 				elif [ "$md5" != "$savedHash" ]; then
 					if content_settled; then
+						log info "First MD5 check"
 						reload_impress
 					else
 						log warning "Content for $file still changing -- deferring reload, keeping current version on screen"
@@ -230,6 +231,7 @@ do
 					log err "LibreOffice failed to open presentation view for $file"
 				fi
 				fileHash["$file"]=$md5
+				log info "fileHash = [$fileHash]"
 
 
 				# Give Main a moment to either succeed or flag read-only
@@ -258,6 +260,8 @@ do
 				        md5Array=("$md5sum")
 						md5=${md5Array}
 						savedHash=${fileHash["$file"]}
+
+						log info "Waiting for the end md5 = [$md5] savedHash = [$savedHash]"
 
 						if [ "$md5" != "$savedHash" ]; then
 							if content_settled; then
