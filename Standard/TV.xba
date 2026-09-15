@@ -205,6 +205,23 @@ Sub Reload
 	activeDoc = GetPresentationDoc()
 	If IsNull(activeDoc) Then Exit Sub
 	
+	&apos; End the running slideshow through its own API before closing the
+	&apos; document underneath it. Bash killing the fullscreen window from
+	&apos; outside (Sway) never gave the presentation engine a chance to
+	&apos; unwind on its own -- LibreOffice&apos;s own bug tracker documents
+	&apos; exactly this class of crash, where the engine object outlives
+	&apos; what killed its window and gets torn into by whatever runs next.
+	On Error Resume Next
+	If Not IsNull(oController) Then
+		If oController.isRunning() Then
+			oPresentation.end()
+		End If
+	End If
+	On Error Goto 0
+	oListener = Nothing
+	oController = Nothing
+	oPresentation = Nothing
+
 	&apos; .uno:Reload runs its own interactive "cancel all changes?" check
 	&apos; whose exact timing against this dispatch process can&apos;t be trusted.
 	&apos; Close outright instead -- setModified(False) means close() has

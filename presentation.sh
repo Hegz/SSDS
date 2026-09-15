@@ -73,7 +73,6 @@ function workspace {
 # argument (which soffice treats as a second document to open, not as a
 # parameter to the macro).
 function signal_current_file {
-	log debug "printing current file [ $REPLY ] to control file"
 	printf '%s' "$REPLY" > "$CONTROL/CurrentFile"
 }
 
@@ -91,40 +90,52 @@ function is_solo_file {
 # anything touch it. A sync in progress can otherwise hand LibreOffice a
 # truncated file mid-transfer, which doesn't error gracefully -- it
 # coredumps the whole process.
+# Confirms $REPLY is actually safe to hand to LibreOffice: not still
+# being written by an in-progress sync, AND not a file that finished
+# syncing but was never a valid .odp to begin with -- a sync that gets
+# interrupted, or catches an already-broken source file, leaves behind
+# something perfectly stable and perfectly corrupt. Either failure
+# means: don't touch it yet.
 function content_settled {
-	local first second
-	log debug "Checkijng for settle"
+	local first second magic
 	first=$(md5sum "$REPLY" 2>/dev/null)
 	sleep 3
 	second=$(md5sum "$REPLY" 2>/dev/null)
-	log debug "first $first second $second"
-	[ -n "$first" ] && [ "$first" = "$second" ]
+	[ -n "$first" ] && [ "$first" = "$second" ] || return 1
+
+	# .odp is a ZIP container; every genuine one starts with ZIP's
+	# magic bytes. Catches truncated or non-document garbage outright,
+	# with no new dependency beyond coreutils.
+	magic=$(head -c 2 "$REPLY" 2>/dev/null)
+	[ "$magic" = "PK" ]
 }
 
 function reload_impress {
 	log notice "File hashes for $file differ, reloading."
-	workspace Hide
-	log debug "Closing Presentation window"
-	$SWAYMSG "[title=\"Presenting: $base\"]" kill
-	sleep 1
-	workspace Load
-	
-	# Give Sway/Wayland time to shift and map the background context
-	sleep 1.5
-	
-	signal_current_file
 
-	log debug "Running the Reload Macro"
+	# Let the presentation engine end itself through its own API first --
+	# see the comment in TV.Reload for why this has to happen before any
+	# window gets killed, not after.
+	signal_current_file
 	if ! $SWAYMSG -- exec "$LIBREOFFICE_BIN" --view --norestore --nologo "macro:///Standard.TV.Reload" 2>&1; then
 		log err "Failed to execute LibreOffice Reload macro for $file"
 	fi
 	sleep 2
 
-	# TV.Reload now just closes the stale document -- reopen the updated
-	# file fresh here, the same plain-path load already used for a file
-	# bash has never encountered before, rather than trust .uno:Reload's
-	# own interactive confirmation dialog to behave.
-	log debug "Re-open the file."
+	# Window should already be gone via oPresentation.end() above; this
+	# is now just a safety net for anything left behind.
+	workspace Hide
+	$SWAYMSG "[title=\"Presenting: $base\"]" kill
+	sleep 1
+	workspace Load
+
+	# Give Sway/Wayland time to shift and map the background context
+	sleep 1.5
+
+	# TV.Reload closes the stale document -- reopen the updated file
+	# fresh here, the same plain-path load already used for a file bash
+	# has never encountered before, rather than trust .uno:Reload's own
+	# interactive confirmation dialog to behave.
 	if ! $SWAYMSG -- exec "$LIBREOFFICE_BIN" --view --norestore --nologo "'""$REPLY""'" 2>&1; then
 		log err "LibreOffice failed to reopen $file after close"
 	fi
@@ -137,7 +148,6 @@ function reload_impress {
 	sleep 1.5
 	
 	signal_current_file
-	log debug "Launch TV Macro"
 	if ! $SWAYMSG -- exec "$LIBREOFFICE_BIN" --view --norestore --nologo "macro:///Standard.TV.Main" 2>&1; then
 		log err "Failed to execute LibreOffice Main macro during reload for $file"
 	fi
@@ -199,11 +209,9 @@ do
 
 			odp) 
 				md5sum=$(md5sum "$REPLY")
-				md5Array=($md5sum)
-				md5=${md5Array[0]} 				# Array index important here...
+				md5Array=("$md5sum")
+				md5=${md5Array}
 				savedHash=${fileHash["$file"]}
-
-				log debug "md5 = <$md5> savedHash = <$savedHash>"
 
 				if ! $SWAYMSG_LOUD -t get_tree | grep -F -q "$file"; then
 					if ! content_settled; then
@@ -239,8 +247,6 @@ do
 					log err "LibreOffice failed to open presentation view for $file"
 				fi
 				fileHash["$file"]=$md5
-				log debug "fileHash = [ ${fileHash[file]} ]"
-
 
 				# Give Main a moment to either succeed or flag read-only
 				# (almost always a stale lock file from an earlier crash or
@@ -265,11 +271,9 @@ do
 					if [ "$rate_limit" -ge 15 ]; then
 						rate_limit=0
                         md5sum=$(md5sum "$REPLY")
-				        md5Array=($md5sum)
-						md5=${md5Array[0]}
+				        md5Array=("$md5sum")
+						md5=${md5Array}
 						savedHash=${fileHash["$file"]}
-
-						log debug "Waiting for the end md5 = <$md5> savedHash = <$savedHash>"
 
 						if [ "$md5" != "$savedHash" ]; then
 							if content_settled; then
