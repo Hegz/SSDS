@@ -100,7 +100,7 @@ function content_settled {
 	local first second magic
 	first=$(md5sum "$REPLY" 2>/dev/null)
 	sleep 3
-	second=$(md5sum "$REPLY" 2>/dev/null)
+	second=$(md5sum "$REPLY" 2>/dev/nuaall)
 	[ -n "$first" ] && [ "$first" = "$second" ] || return 1
 
 	# .odp is a ZIP container; every genuine one starts with ZIP's
@@ -120,6 +120,7 @@ function reload_impress {
 	# let a fresh one cold-start. Slower, but nothing survives to be
 	# stale, disposed, or half-torn-down for the next macro call to trip
 	# over.
+	log debug "(reload) Killing soffice, removing locks"
 	workspace Hide
 	$BIN_PATH/killall soffice.bin
 	sleep 2
@@ -128,6 +129,7 @@ function reload_impress {
 	# Same plain-path load already proven safe for a file bash has never
 	# encountered before -- this call starts LibreOffice from nothing
 	# and opens the file in one step, exactly like a genuine first load.
+	log debug "(reload) loading file $REPLY"
 	workspace Load
 	if ! $SWAYMSG -- exec "$LIBREOFFICE_BIN" --view --norestore --nologo "'""$REPLY""'" 2>&1; then
 		log err "LibreOffice failed to reopen $file after restart"
@@ -135,6 +137,7 @@ function reload_impress {
 	sleep 1
 	workspace Hide
 	sleep 15
+	log debug "Reload proceedure complete."
 }
 
 # Start Libreoffice on the load workspace, then Hide
@@ -193,11 +196,14 @@ do
 
 			odp) 
 				md5sum=$(md5sum "$REPLY")
-				md5Array=("$md5sum")
-				md5=${md5Array}
+				md5Array=($md5sum)
+				md5=${md5Array[0]}
 				savedHash=${fileHash["$file"]}
 
+				log debug "case ODP: md5=[$md5] savedHash=[$savedHash] file=[$file] reply=[$REPLY]"
+
 				if ! $SWAYMSG_LOUD -t get_tree | grep -F -q "$file"; then
+					log debug "Passwd first Freload check"
 					if ! content_settled; then
 						log warning "Content for $file still changing -- skipping this pass, will retry"
 						continue
@@ -212,6 +218,7 @@ do
 					sleep 15
 
 				elif [ "$md5" != "$savedHash" ]; then
+					log debug "Failed First hash check md5=[$md5] savedHash=[$savedHash]"
 					if content_settled; then
 						reload_impress
 					else
@@ -264,11 +271,13 @@ do
 					if [ "$rate_limit" -ge 15 ]; then
 						rate_limit=0
                         md5sum=$(md5sum "$REPLY")
-				        md5Array=("$md5sum")
-						md5=${md5Array}
+				        md5Array=($md5sum)
+						md5=${md5Array[0]}
 						savedHash=${fileHash["$file"]}
+						log debug "Waiting loop: md5=[$md5] savedHash=[$savedHash]"
 
 						if [ "$md5" != "$savedHash" ]; then
+							log debug "hash check failed: md5=[$md5] savedHash=[$savedHash]"
 							if content_settled; then
 								reload_impress
 								fileHash["$file"]=$md5
