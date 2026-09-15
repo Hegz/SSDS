@@ -195,7 +195,8 @@ do
 				md5=${md5Array[0]} 				# Array index important here...
 				savedHash=${fileHash["$file"]}
 
-				log info "Md5sum($md5) savedHash($savedHash)"
+				log debug "md5 = <$md5> savedHash = <$savedHash>"
+
 				if ! $SWAYMSG_LOUD -t get_tree | grep -F -q "$file"; then
 					if ! content_settled; then
 						log warning "Content for $file still changing -- skipping this pass, will retry"
@@ -230,7 +231,7 @@ do
 					log err "LibreOffice failed to open presentation view for $file"
 				fi
 				fileHash["$file"]=$md5
-				log info "fileHash = [ ${fileHash[file]} ]"
+				log debug "fileHash = [ ${fileHash[file]} ]"
 
 
 				# Give Main a moment to either succeed or flag read-only
@@ -256,11 +257,11 @@ do
 					if [ "$rate_limit" -ge 15 ]; then
 						rate_limit=0
                         md5sum=$(md5sum "$REPLY")
-				        md5Array=("$md5sum")
-						md5=${md5Array}
+				        md5Array=($md5sum)
+						md5=${md5Array[0]}
 						savedHash=${fileHash["$file"]}
 
-						log info "Waiting for the end md5 = [$md5] savedHash = [$savedHash]"
+						log debug "Waiting for the end md5 = <$md5> savedHash = <$savedHash>"
 
 						if [ "$md5" != "$savedHash" ]; then
 							if content_settled; then
