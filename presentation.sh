@@ -248,11 +248,20 @@ do
 				fi
 				fileHash["$file"]=$md5
 
-				# Give Main a moment to either succeed or flag read-only
-				# (almost always a stale lock file from an earlier crash or
-				# an unclean office_refresh kill) before we start waiting
-				# on an End signal that a read-only document can never send.
+				# Give Main a moment to either succeed or flag read-only /
+				# a trapped error (almost always a stale lock file from an
+				# earlier crash, an unclean office_refresh kill, or a
+				# disposed-object exception from a fast reload) before we
+				# start waiting on an End signal that either can prevent.
 				sleep 2
+				if [ -f "$CONTROL/MacroError" ]; then
+					log warning "$(cat "$CONTROL/MacroError" 2>/dev/null) -- closing, will load fresh next pass"
+					rm -f "$CONTROL/MacroError"
+					workspace Hide
+					$SWAYMSG "[title=\"$file.*\"]" kill
+					unset "fileHash[$file]"
+					continue
+				fi
 				if [ -f "$CONTROL/ReadOnly" ]; then
 					log warning "$(cat "$CONTROL/ReadOnly" 2>/dev/null) -- closing, clearing stale lock, will load fresh next pass"
 					rm -f "$CONTROL/ReadOnly"
@@ -281,6 +290,9 @@ do
 								fileHash["$file"]=$md5
 								if [ -f "$CONTROL/ReadOnly" ]; then
 									log warning "$(cat "$CONTROL/ReadOnly" 2>/dev/null) -- reload landed read-only; not auto-recovered mid-show, needs a look"
+								fi
+								if [ -f "$CONTROL/MacroError" ]; then
+									log warning "$(cat "$CONTROL/MacroError" 2>/dev/null) -- reload hit a trapped error; not auto-recovered mid-show, needs a look"
 								fi
 							else
 								log warning "Content for $file still changing -- deferring reload, keeping current version on screen"

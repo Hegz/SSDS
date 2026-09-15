@@ -7,6 +7,7 @@ Global Const path = &quot;/home/otto/Presentation/&quot;
 Global Const endFile = &quot;/home/otto/Control/End&quot;
 Global Const currentFileControl = &quot;/home/otto/Control/CurrentFile&quot;
 Global Const readOnlyFlag = &quot;/home/otto/Control/ReadOnly&quot;
+Global Const macroErrorFlag = &quot;/home/otto/Control/MacroError&quot;
 
 &apos; Seconds to pause between slides
 Global Const Slideshow_Pause = 7
@@ -41,26 +42,40 @@ Function GetPresentationDoc() As Object
         sTargetURL = ConvertToURL(sTargetFile)
         oEnum = StarDesktop.Components.createEnumeration()
         While oEnum.hasMoreElements()
+            &apos; A just-closed document can leave a disposed ghost in this
+            &apos; enumeration briefly. Touching one throws a UNO
+            &apos; DisposedException -- trap it per-component so that one
+            &apos; ghost can&apos;t abort the whole search for the real document.
+            On Error Resume Next
             oComp = oEnum.nextElement()
             If HasUnoInterfaces(oComp, "com.sun.star.drawing.XDrawPagesSupplier") Then
                 If oComp.getURL() = sTargetURL Then
+                    On Error Goto 0
                     GetPresentationDoc = oComp
                     Exit Function
                 End If
             End If
+            On Error Goto 0
         Wend
     End If
 
     &apos; Last-resort fallback only if the control file was missing or stale
+    On Error Resume Next
     If HasUnoInterfaces(ThisComponent, "com.sun.star.drawing.XDrawPagesSupplier") Then
         GetPresentationDoc = ThisComponent
     End If
+    On Error Goto 0
 End Function
 
 Sub Main
 	Dim Doc as Object
 	Dim CurSlide as Object
 	Dim i as Integer
+
+	&apos; Last resort: whatever this doesn&apos;t anticipate specifically, this
+	&apos; still catches, logs, and exits gracefully instead of leaving an
+	&apos; exception free to climb all the way out and abort the process.
+	On Error Goto MainErrorHandler
 	
 	Doc = GetPresentationDoc()
 	If IsNull(Doc) Then
@@ -108,6 +123,10 @@ Sub Main
 	End If
 
 	addListener
+	Exit Sub
+
+MainErrorHandler:
+	writeText(macroErrorFlag, "Main() error " &amp; Err &amp; ": " &amp; Error$ &amp; " at " &amp; Now)
 End Sub
 
 Sub EV_slideEnded(oEv)
@@ -160,6 +179,8 @@ Function IsSoloFile() As Boolean
 End Function
 
 Sub addListener
+	On Error Goto AddListenerErrorHandler
+
 	oDoc = GetPresentationDoc()
 	If IsNull(oDoc) Then Exit Sub
 
@@ -197,10 +218,16 @@ Sub addListener
 	&apos; startup sequence that could possibly touch it -- this is the
 	&apos; actual last word on the subject, not the one in Main.
 	oDoc.setModified(False)
+	Exit Sub
+
+AddListenerErrorHandler:
+	writeText(macroErrorFlag, "addListener() error " &amp; Err &amp; ": " &amp; Error$ &amp; " at " &amp; Now)
 End Sub
 
 Sub Reload
 	Dim activeDoc As Object
+
+	On Error Goto ReloadErrorHandler
 	
 	activeDoc = GetPresentationDoc()
 	If IsNull(activeDoc) Then Exit Sub
@@ -211,13 +238,11 @@ Sub Reload
 	&apos; unwind on its own -- LibreOffice&apos;s own bug tracker documents
 	&apos; exactly this class of crash, where the engine object outlives
 	&apos; what killed its window and gets torn into by whatever runs next.
-	On Error Resume Next
 	If Not IsNull(oController) Then
 		If oController.isRunning() Then
 			oPresentation.end()
 		End If
 	End If
-	On Error Goto 0
 	oListener = Nothing
 	oController = Nothing
 	oPresentation = Nothing
@@ -230,6 +255,10 @@ Sub Reload
 	&apos; never seen before.
 	activeDoc.setModified(False)
 	activeDoc.close(False)
+	Exit Sub
+
+ReloadErrorHandler:
+	writeText(macroErrorFlag, "Reload() error " &amp; Err &amp; ": " &amp; Error$ &amp; " at " &amp; Now)
 End Sub
 
 Sub writeText(myFile As String, myText As String)
