@@ -100,7 +100,7 @@ function content_settled {
 	local first second magic
 	first=$(md5sum "$REPLY" 2>/dev/null)
 	sleep 3
-	second=$(md5sum "$REPLY" 2>/dev/nuaall)
+	second=$(md5sum "$REPLY" 2>/dev/null)
 	[ -n "$first" ] && [ "$first" = "$second" ] || return 1
 
 	# .odp is a ZIP container; every genuine one starts with ZIP's
