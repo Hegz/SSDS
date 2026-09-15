@@ -195,6 +195,7 @@ do
 				md5=${md5Array}
 				savedHash=${fileHash["$file"]}
 
+				log info "Md5sum($md5) savedHash($savedHash)"
 				if ! $SWAYMSG_LOUD -t get_tree | grep -F -q "$file"; then
 					if ! content_settled; then
 						log warning "Content for $file still changing -- skipping this pass, will retry"
@@ -229,6 +230,7 @@ do
 					log err "LibreOffice failed to open presentation view for $file"
 				fi
 				fileHash["$file"]=$md5
+
 
 				# Give Main a moment to either succeed or flag read-only
 				# (almost always a stale lock file from an earlier crash or
