@@ -73,6 +73,7 @@ function workspace {
 # argument (which soffice treats as a second document to open, not as a
 # parameter to the macro).
 function signal_current_file {
+	log debug "printing current file [ $REPLY ] to control file"
 	printf '%s' "$REPLY" > "$CONTROL/CurrentFile"
 }
 
@@ -92,15 +93,18 @@ function is_solo_file {
 # coredumps the whole process.
 function content_settled {
 	local first second
+	log debug "Checkijng for settle"
 	first=$(md5sum "$REPLY" 2>/dev/null)
 	sleep 3
 	second=$(md5sum "$REPLY" 2>/dev/null)
+	log debug "first $first second $second"
 	[ -n "$first" ] && [ "$first" = "$second" ]
 }
 
 function reload_impress {
 	log notice "File hashes for $file differ, reloading."
 	workspace Hide
+	log debug "Closing Presentation window"
 	$SWAYMSG "[title=\"Presenting: $base\"]" kill
 	sleep 1
 	workspace Load
@@ -109,6 +113,8 @@ function reload_impress {
 	sleep 1.5
 	
 	signal_current_file
+
+	log debug "Running the Reload Macro"
 	if ! $SWAYMSG -- exec "$LIBREOFFICE_BIN" --view --norestore --nologo "macro:///Standard.TV.Reload" 2>&1; then
 		log err "Failed to execute LibreOffice Reload macro for $file"
 	fi
@@ -118,6 +124,7 @@ function reload_impress {
 	# file fresh here, the same plain-path load already used for a file
 	# bash has never encountered before, rather than trust .uno:Reload's
 	# own interactive confirmation dialog to behave.
+	log debug "Re-open the file."
 	if ! $SWAYMSG -- exec "$LIBREOFFICE_BIN" --view --norestore --nologo "'""$REPLY""'" 2>&1; then
 		log err "LibreOffice failed to reopen $file after close"
 	fi
@@ -130,6 +137,7 @@ function reload_impress {
 	sleep 1.5
 	
 	signal_current_file
+	log debug "Launch TV Macro"
 	if ! $SWAYMSG -- exec "$LIBREOFFICE_BIN" --view --norestore --nologo "macro:///Standard.TV.Main" 2>&1; then
 		log err "Failed to execute LibreOffice Main macro during reload for $file"
 	fi
