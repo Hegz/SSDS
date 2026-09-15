@@ -131,7 +131,7 @@ function reload_impress {
 	# and opens the file in one step, exactly like a genuine first load.
 	log debug "(reload) loading file $REPLY"
 	workspace Load
-	if ! $SWAYMSG -- exec "$LIBREOFFICE_BIN" --view --norestore --nologo "'""$REPLY""'" 2>&1; then
+	if ! $SWAYMSG -- exec "$LIBREOFFICE_BIN" --norestore --nologo "'""$REPLY""'" 2>&1; then
 		log err "LibreOffice failed to reopen $file after restart"
 	fi
 	sleep 1
@@ -142,7 +142,7 @@ function reload_impress {
 
 # Start Libreoffice on the load workspace, then Hide
 workspace Load
-$SWAYMSG -- exec "$LIBREOFFICE_BIN" --view --norestore --nologo &
+$SWAYMSG -- exec "$LIBREOFFICE_BIN"  --norestore --nologo &
 workspace Hide
 
 # main loop
@@ -203,14 +203,14 @@ do
 				log debug "case ODP: md5=[$md5] savedHash=[$savedHash] file=[$file] reply=[$REPLY]"
 
 				if ! $SWAYMSG_LOUD -t get_tree | grep -F -q "$file"; then
-					log debug "Passwd first Freload check"
+					log debug "Passed first preload check"
 					if ! content_settled; then
 						log warning "Content for $file still changing -- skipping this pass, will retry"
 						continue
 					fi
 					log info "Document $file not preloaded. Loading now."
 					workspace Load
-					if ! $SWAYMSG -- exec "$LIBREOFFICE_BIN" --view --norestore --nologo "'""$REPLY""'" 2>&1; then
+					if ! $SWAYMSG -- exec "$LIBREOFFICE_BIN"  --norestore --nologo "'""$REPLY""'" 2>&1; then
 						log err "LibreOffice failed initial preload background window for $file"
 					fi
 				    sleep 1	
@@ -234,10 +234,11 @@ do
 				sleep 1.5
 
 				signal_current_file
-				if ! $SWAYMSG -- exec "$LIBREOFFICE_BIN" --view --norestore --nologo "macro:///Standard.TV.Main" 2>&1; then
+				if ! $SWAYMSG -- exec "$LIBREOFFICE_BIN"  --norestore --nologo "macro:///Standard.TV.Main" 2>&1; then
 					log err "LibreOffice failed to open presentation view for $file"
 				fi
 				fileHash["$file"]=$md5
+				log debug "saving filehash filehash=[${fileHash[$file]}] md5=[$md5]"
 
 				# Give Main a moment to either succeed or flag read-only /
 				# a trapped error (almost always a stale lock file from an
@@ -285,7 +286,7 @@ do
 								workspace Slide
 								sleep 1.5
 								signal_current_file
-								if ! $SWAYMSG -- exec "$LIBREOFFICE_BIN" --view --norestore --nologo "macro:///Standard.TV.Main" 2>&1; then
+								if ! $SWAYMSG -- exec "$LIBREOFFICE_BIN"  --norestore --nologo "macro:///Standard.TV.Main" 2>&1; then
 									log err "Failed to execute LibreOffice Main macro during reload for $file"
 								fi
 								sleep 2
