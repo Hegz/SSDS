@@ -192,7 +192,7 @@ do
 			odp) 
 				md5sum=$(md5sum "$REPLY")
 				md5Array=("$md5sum")
-				md5=${md5Array}
+				md5=${md5Array[0]} 				# Array index important here...
 				savedHash=${fileHash["$file"]}
 
 				log info "Md5sum($md5) savedHash($savedHash)"
