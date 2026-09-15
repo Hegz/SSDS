@@ -86,6 +86,18 @@ function is_solo_file {
 	[ "$count" -eq 1 ]
 }
 
+# Confirms $REPLY's content has actually stopped changing before we let
+# anything touch it. A sync in progress can otherwise hand LibreOffice a
+# truncated file mid-transfer, which doesn't error gracefully -- it
+# coredumps the whole process.
+function content_settled {
+	local first second
+	first=$(md5sum "$REPLY" 2>/dev/null)
+	sleep 3
+	second=$(md5sum "$REPLY" 2>/dev/null)
+	[ -n "$first" ] && [ "$first" = "$second" ]
+}
+
 function reload_impress {
 	log notice "File hashes for $file differ, reloading."
 	workspace Hide
@@ -184,6 +196,10 @@ do
 				savedHash=${fileHash["$file"]}
 
 				if ! $SWAYMSG_LOUD -t get_tree | grep -F -q "$file"; then
+					if ! content_settled; then
+						log warning "Content for $file still changing -- skipping this pass, will retry"
+						continue
+					fi
 					log info "Document $file not preloaded. Loading now."
 					workspace Load
 					if ! $SWAYMSG -- exec "$LIBREOFFICE_BIN" --view --norestore --nologo "'""$REPLY""'" 2>&1; then
@@ -194,7 +210,12 @@ do
 					sleep 15
 
 				elif [ "$md5" != "$savedHash" ]; then
-					reload_impress
+					if content_settled; then
+						reload_impress
+					else
+						log warning "Content for $file still changing -- deferring reload, keeping current version on screen"
+						md5="$savedHash"
+					fi
 				fi
 
 				log info "Starting presentation: $file"
@@ -237,10 +258,14 @@ do
 						savedHash=${fileHash["$file"]}
 
 						if [ "$md5" != "$savedHash" ]; then
-							reload_impress
-							fileHash["$file"]=$md5
-							if [ -f "$CONTROL/ReadOnly" ]; then
-								log warning "$(cat "$CONTROL/ReadOnly" 2>/dev/null) -- reload landed read-only; not auto-recovered mid-show, needs a look"
+							if content_settled; then
+								reload_impress
+								fileHash["$file"]=$md5
+								if [ -f "$CONTROL/ReadOnly" ]; then
+									log warning "$(cat "$CONTROL/ReadOnly" 2>/dev/null) -- reload landed read-only; not auto-recovered mid-show, needs a look"
+								fi
+							else
+								log warning "Content for $file still changing -- deferring reload, keeping current version on screen"
 							fi
 						fi
 					fi
