@@ -111,46 +111,30 @@ function content_settled {
 }
 
 function reload_impress {
-	log notice "File hashes for $file differ, reloading."
+	log notice "File hashes for $file differ -- restarting LibreOffice entirely to reload cleanly."
 
-	# Let the presentation engine end itself through its own API first --
-	# see the comment in TV.Reload for why this has to happen before any
-	# window gets killed, not after.
-	signal_current_file
-	if ! $SWAYMSG -- exec "$LIBREOFFICE_BIN" --view --norestore --nologo "macro:///Standard.TV.Reload" 2>&1; then
-		log err "Failed to execute LibreOffice Reload macro for $file"
-	fi
+	# No graceful in-process teardown here on purpose. Three attempts at
+	# gracefully closing/reloading a live document from inside a running
+	# process each found a new way to coredump. office_refresh has never
+	# once crashed doing exactly this instead: kill the whole process,
+	# let a fresh one cold-start. Slower, but nothing survives to be
+	# stale, disposed, or half-torn-down for the next macro call to trip
+	# over.
+	workspace Hide
+	$BIN_PATH/killall soffice.bin
 	sleep 2
+	find "$PRESENTATION" -maxdepth 1 -type f -name ".~lock.${file}#" -delete 2>/dev/null
 
-	# Window should already be gone via oPresentation.end() above; this
-	# is now just a safety net for anything left behind.
-	workspace Hide
-	$SWAYMSG "[title=\"Presenting: $base\"]" kill
-	sleep 1
+	# Same plain-path load already proven safe for a file bash has never
+	# encountered before -- this call starts LibreOffice from nothing
+	# and opens the file in one step, exactly like a genuine first load.
 	workspace Load
-
-	# Give Sway/Wayland time to shift and map the background context
-	sleep 1.5
-
-	# TV.Reload closes the stale document -- reopen the updated file
-	# fresh here, the same plain-path load already used for a file bash
-	# has never encountered before, rather than trust .uno:Reload's own
-	# interactive confirmation dialog to behave.
 	if ! $SWAYMSG -- exec "$LIBREOFFICE_BIN" --view --norestore --nologo "'""$REPLY""'" 2>&1; then
-		log err "LibreOffice failed to reopen $file after close"
+		log err "LibreOffice failed to reopen $file after restart"
 	fi
 	sleep 1
 	workspace Hide
-	sleep 10
-	workspace Slide
-	
-	# Give Sway time to anchor focus before triggering the initialization loop macro
-	sleep 1.5
-	
-	signal_current_file
-	if ! $SWAYMSG -- exec "$LIBREOFFICE_BIN" --view --norestore --nologo "macro:///Standard.TV.Main" 2>&1; then
-		log err "Failed to execute LibreOffice Main macro during reload for $file"
-	fi
+	sleep 15
 }
 
 # Start Libreoffice on the load workspace, then Hide
@@ -288,6 +272,15 @@ do
 							if content_settled; then
 								reload_impress
 								fileHash["$file"]=$md5
+
+								workspace Slide
+								sleep 1.5
+								signal_current_file
+								if ! $SWAYMSG -- exec "$LIBREOFFICE_BIN" --view --norestore --nologo "macro:///Standard.TV.Main" 2>&1; then
+									log err "Failed to execute LibreOffice Main macro during reload for $file"
+								fi
+								sleep 2
+
 								if [ -f "$CONTROL/ReadOnly" ]; then
 									log warning "$(cat "$CONTROL/ReadOnly" 2>/dev/null) -- reload landed read-only; not auto-recovered mid-show, needs a look"
 								fi
