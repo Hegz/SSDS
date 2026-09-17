@@ -48,7 +48,7 @@ function load_config {
     # Set default values first in case keys are missing
     ORDER_BY="alphabetical"
     ImageSleepTime=6
-	DEBUG_LOGGING="false"
+    DEBUG_LOGGING="false"
 
     if [ -f "$PRESENTATION/config.ini" ]; then
         while IFS='=' read -r key value; do
@@ -57,7 +57,7 @@ function load_config {
         ORDER_BY=${ORDER_BY:-alphabetical}
         # Save the modification timestamp of the config file
         LAST_CONFIG_MOD=$(stat -c %Y "$PRESENTATION/config.ini" 2>/dev/null || echo 0)
-        log info "Configuration loaded/reloaded. ORDER_BY=$ORDER_BY, ImageSleepTime=$ImageSleepTime, DEBUG_LOGGING=$DEBUG_LOGGING"
+        log notice "Configuration loaded/reloaded. ORDER_BY=$ORDER_BY, ImageSleepTime=$ImageSleepTime, DEBUG_LOGGING=$DEBUG_LOGGING"
     else
         LAST_CONFIG_MOD=0
         log warning "config.ini not found at $PRESENTATION/config.ini. Using system defaults."
@@ -116,7 +116,7 @@ function content_settled {
 }
 
 function reload_impress {
-	log info "File hashes for $file differ -- restarting LibreOffice entirely to reload cleanly."
+	log notice "File hashes for $file differ -- restarting LibreOffice entirely to reload cleanly."
 
 	# No graceful in-process teardown here on purpose. Three attempts at
 	# gracefully closing/reloading a live document from inside a running
@@ -147,7 +147,7 @@ function reload_impress {
 
 # Start Libreoffice on the load workspace, then Hide
 workspace Load
-$SWAYMSG -- exec "$LIBREOFFICE_BIN"  --norestore --nologo &
+$SWAYMSG -- exec "$LIBREOFFICE_BIN" --norestore --nologo &
 workspace Hide
 
 # main loop
@@ -215,7 +215,7 @@ do
 					fi
 					log info "Document $file not preloaded. Loading now."
 					workspace Load
-					if ! $SWAYMSG -- exec "$LIBREOFFICE_BIN"  --norestore --nologo "'""$REPLY""'" 2>&1; then
+					if ! $SWAYMSG -- exec "$LIBREOFFICE_BIN" --norestore --nologo "'""$REPLY""'" 2>&1; then
 						log err "LibreOffice failed initial preload background window for $file"
 					fi
 				    sleep 1	
@@ -239,7 +239,7 @@ do
 				sleep 1.5
 
 				signal_current_file
-				if ! $SWAYMSG -- exec "$LIBREOFFICE_BIN"  --norestore --nologo "macro:///Standard.TV.Main" 2>&1; then
+				if ! $SWAYMSG -- exec "$LIBREOFFICE_BIN" --norestore --nologo "macro:///Standard.TV.Main" 2>&1; then
 					log err "LibreOffice failed to open presentation view for $file"
 				fi
 				fileHash["$file"]=$md5
@@ -276,6 +276,13 @@ do
 					
 					if [ "$rate_limit" -ge 15 ]; then
 						rate_limit=0
+
+						if ! pgrep -x soffice.bin >/dev/null 2>&1; then
+							log err "soffice.bin is no longer running (crash or OOM) -- abandoning wait, $file will reload fresh next pass"
+							unset "fileHash[$file]"
+							break
+						fi
+
                         md5sum=$(md5sum "$REPLY")
 				        md5Array=($md5sum)
 						md5=${md5Array[0]}
@@ -291,7 +298,7 @@ do
 								workspace Slide
 								sleep 1.5
 								signal_current_file
-								if ! $SWAYMSG -- exec "$LIBREOFFICE_BIN"  --norestore --nologo "macro:///Standard.TV.Main" 2>&1; then
+								if ! $SWAYMSG -- exec "$LIBREOFFICE_BIN" --norestore --nologo "macro:///Standard.TV.Main" 2>&1; then
 									log err "Failed to execute LibreOffice Main macro during reload for $file"
 								fi
 								sleep 2
