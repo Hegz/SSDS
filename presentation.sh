@@ -35,8 +35,12 @@ Weekdays=(Monday Tuesday Wednesday Thursday Friday Saturday Sunday)
 function log() {
     local priority="$1"
     local message="$2"
-    logger -t presentation-script -p "user.$priority" "$message"
-    echo "[$priority] $message"
+	local PRIO="${1^^}"
+
+    if [ "$PRIO" = "DEBUG" ] && [ "${DEBUG_LOGGING,,}" != "true" ]; then
+        return
+    fi
+    logger -t presentation-script -p "user.$priority" "[$PRIO] $message"
 }
 
 # Function to load configuration parameters
@@ -44,6 +48,7 @@ function load_config {
     # Set default values first in case keys are missing
     ORDER_BY="alphabetical"
     ImageSleepTime=6
+	DEBUG_LOGGING="false"
 
     if [ -f "$PRESENTATION/config.ini" ]; then
         while IFS='=' read -r key value; do
@@ -52,7 +57,7 @@ function load_config {
         ORDER_BY=${ORDER_BY:-alphabetical}
         # Save the modification timestamp of the config file
         LAST_CONFIG_MOD=$(stat -c %Y "$PRESENTATION/config.ini" 2>/dev/null || echo 0)
-        log notice "Configuration loaded/reloaded. ORDER_BY=$ORDER_BY, ImageSleepTime=$ImageSleepTime"
+        log info "Configuration loaded/reloaded. ORDER_BY=$ORDER_BY, ImageSleepTime=$ImageSleepTime, DEBUG_LOGGING=$DEBUG_LOGGING"
     else
         LAST_CONFIG_MOD=0
         log warning "config.ini not found at $PRESENTATION/config.ini. Using system defaults."
@@ -111,7 +116,7 @@ function content_settled {
 }
 
 function reload_impress {
-	log notice "File hashes for $file differ -- restarting LibreOffice entirely to reload cleanly."
+	log info "File hashes for $file differ -- restarting LibreOffice entirely to reload cleanly."
 
 	# No graceful in-process teardown here on purpose. Three attempts at
 	# gracefully closing/reloading a live document from inside a running
